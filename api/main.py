@@ -1,47 +1,53 @@
-"""API inicial do desafio MPRJ.
-
-A API é funcional, mas ainda não contém avaliações: respostas vazias são
-intencionais até implementar a coleta e a persistência.
-"""
+"""API de evidências coletadas. Nenhuma pontuação legal é inferida de HTTP 200."""
 from fastapi import FastAPI, HTTPException
+from src import database
 
-app = FastAPI(
-    title="Transparência Inteligente — MPRJ",
-    version="0.1.0",
-    description="API inicial de monitoramento de portais públicos; nenhuma avaliação executada.",
-)
-
-ENTITIES: list[dict] = []
+app = FastAPI(title="Transparência Inteligente — MPRJ", version="0.2.0")
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "phase": "bootstrap", "evaluations_executed": 0}
+    return {"status": "ok", "phase": "evidence_storage"}
 
 
 @app.get("/entities")
 def list_entities() -> list[dict]:
-    return ENTITIES
+    with database.connect() as db:
+        return database.entities(db)
 
 
 @app.get("/entities/{entity_id}")
 def get_entity(entity_id: int) -> dict:
-    entity = next((e for e in ENTITIES if e.get("id") == entity_id), None)
-    if entity is None:
+    with database.connect() as db:
+        value = database.entity(db, entity_id)
+    if value is None:
         raise HTTPException(status_code=404, detail="Entidade não cadastrada")
-    return entity
+    return value
 
 
 @app.get("/entities/{entity_id}/evaluations/latest")
 def latest_evaluation(entity_id: int) -> dict:
-    raise HTTPException(status_code=404, detail="Nenhuma avaliação disponível")
+    with database.connect() as db:
+        if database.entity(db, entity_id) is None:
+            raise HTTPException(status_code=404, detail="Entidade não cadastrada")
+        value = database.latest(db, entity_id)
+    if value is None:
+        raise HTTPException(status_code=404, detail="Nenhuma avaliação disponível")
+    return value
 
 
 @app.get("/entities/{entity_id}/evaluations/history")
 def evaluation_history(entity_id: int) -> list[dict]:
-    raise HTTPException(status_code=404, detail="Nenhuma avaliação disponível")
+    with database.connect() as db:
+        if database.entity(db, entity_id) is None:
+            raise HTTPException(status_code=404, detail="Entidade não cadastrada")
+        return database.history(db, entity_id)
 
 
 @app.get("/entities/{entity_id}/criteria")
 def entity_criteria(entity_id: int) -> list[dict]:
-    raise HTTPException(status_code=404, detail="Critérios ainda não cadastrados")
+    with database.connect() as db:
+        if database.entity(db, entity_id) is None:
+            raise HTTPException(status_code=404, detail="Entidade não cadastrada")
+        value = database.latest(db, entity_id)
+    return value["criteria"] if value else []
