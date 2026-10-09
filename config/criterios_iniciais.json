@@ -1,0 +1,42 @@
+[
+  {
+    "id": "1.1",
+    "grupo": "INFORMAÇÕES PRIORITÁRIAS",
+    "descricao": "A entidade pública possui sítio oficial e/ou portal da transparência próprio ou compartilhado na internet?",
+    "metodo": "disponibilidade_http",
+    "estado": "implementado_parcial",
+    "revisao_humana": true
+  },
+  {
+    "id": "1.2",
+    "grupo": "INFORMAÇÕES PRIORITÁRIAS",
+    "descricao": "O acesso ao portal transparência está visível na capa do site?",
+    "metodo": "link_candidato_html",
+    "estado": "coleta_de_indicios",
+    "revisao_humana": true
+  },
+  {
+    "id": "1.3",
+    "grupo": "INFORMAÇÕES PRIORITÁRIAS",
+    "descricao": "O site contém ferramenta de pesquisa de conteúdo que permita o acesso à informação?",
+    "metodo": "pendente",
+    "estado": "nao_implementado",
+    "revisao_humana": true
+  },
+  {
+    "id": "2.1",
+    "grupo": "INFORMAÇÕES INSTITUCIONAIS",
+    "descricao": "Competências e/ou atribuições",
+    "metodo": "pendente",
+    "estado": "nao_implementado",
+    "revisao_humana": true
+  },
+  {
+    "id": "2.2",
+    "grupo": "INFORMAÇÕES INSTITUCIONAIS",
+    "descricao": "Estrutura organizacional",
+    "metodo": "pendente",
+    "estado": "nao_implementado",
+    "revisao_humana": true
+  }
+]
