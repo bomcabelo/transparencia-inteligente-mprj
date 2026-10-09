@@ -7,7 +7,7 @@ app = FastAPI(title="Transparência Inteligente — MPRJ", version="0.2.0")
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "phase": "evidence_storage"}
+    return {"status": "ok", "phase": "evidence_storage", "evaluations_executed": 0}
 
 
 @app.get("/entities")
