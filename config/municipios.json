@@ -1,0 +1,32 @@
+[
+  {
+    "nome": "Duque de Caxias",
+    "uf": "RJ",
+    "site": "https://portal.duquedecaxias.rj.gov.br/",
+    "portal": "https://transparencia.duquedecaxias.rj.gov.br/"
+  },
+  {
+    "nome": "Japeri",
+    "uf": "RJ",
+    "site": "https://japeri.rj.gov.br/",
+    "portal": null
+  },
+  {
+    "nome": "Itaboraí",
+    "uf": "RJ",
+    "site": null,
+    "portal": null
+  },
+  {
+    "nome": "Cachoeiras de Macacu",
+    "uf": "RJ",
+    "site": "https://www.prefeituracachoeiras.com/",
+    "portal": null
+  },
+  {
+    "nome": "Rio de Janeiro",
+    "uf": "RJ",
+    "site": "https://www.pcrj.rj.gov.br/",
+    "portal": null
+  }
+]
