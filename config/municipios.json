@@ -3,7 +3,7 @@
     "nome": "Duque de Caxias",
     "uf": "RJ",
     "site": "https://portal.duquedecaxias.rj.gov.br/",
-    "portal": "https://transparencia.duquedecaxias.rj.gov.br/"
+    "portal": null
   },
   {
     "nome": "Japeri",
@@ -14,7 +14,7 @@
   {
     "nome": "Itaboraí",
     "uf": "RJ",
-    "site": null,
+    "site": "https://site.ib.itaborai.rj.gov.br/",
     "portal": null
   },
   {
