@@ -26,7 +26,7 @@
   {
     "nome": "Rio de Janeiro",
     "uf": "RJ",
-    "site": "https://www.pcrj.rj.gov.br/",
-    "portal": null
+    "site": "https://prefeitura.rio/",
+    "portal": "https://transparencia.prefeitura.rio/"
   }
 ]
