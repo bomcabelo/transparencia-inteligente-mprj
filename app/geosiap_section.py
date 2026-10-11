@@ -40,6 +40,11 @@ def render_geosiap(get, municipio_selecionado: dict) -> None:
         st.error('A evidência retornada não corresponde ao município selecionado.')
         return
 
+    if item.get('criterion') == '3.1':
+        from app.geosiap_receitas_painel import mostrar_receitas
+        mostrar_receitas(item)
+        return
+
     a, b, c = st.columns(3)
     a.metric('Registros analisados', item.get('record_count', 0))
     b.metric('Critério', item.get('criterion', '—'))

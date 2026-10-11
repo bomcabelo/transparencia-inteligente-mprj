@@ -41,6 +41,8 @@ FIELDS = (
  'monetary_parseable_fields','monetary_zero_counts','monetary_missing_counts',
  'monetary_invalid_counts','monetary_negative_counts','records_without_id_empenho',
  'years_observed','criterion','assessment_status','assessment_reason','limitations',
+ 'fields_observed','essential_fields_present','essential_fields_missing',
+ 'http_status','source_url','legal_assessment_status',
 )
 
 
