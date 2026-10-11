@@ -62,3 +62,7 @@ for criterion in latest.get("criteria", []):
 
 st.subheader("Histórico de coletas")
 st.dataframe(history, use_container_width=True, hide_index=True)
+
+# Integração GeoSIAP — Etapa 8
+from app.geosiap_section import render_geosiap
+render_geosiap(get, selected)

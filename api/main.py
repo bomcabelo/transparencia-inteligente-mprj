@@ -51,3 +51,7 @@ def entity_criteria(entity_id: int) -> list[dict]:
             raise HTTPException(status_code=404, detail="Entidade não cadastrada")
         value = database.latest(db, entity_id)
     return value["criteria"] if value else []
+
+# Integração GeoSIAP — Etapa 8
+from api.geosiap_routes import router as geosiap_router
+app.include_router(geosiap_router)
