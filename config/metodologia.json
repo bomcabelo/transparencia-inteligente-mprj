@@ -1,0 +1,40 @@
+{
+  "versao": "metodologia-1.0",
+  "descricao": "Parâmetros de pontuação. Alterar aqui gera nova versão: avaliações só são comparáveis dentro da mesma versão (ou após reprocessamento).",
+  "valor_por_status": {
+    "atende": 1.0,
+    "parcial": 0.5,
+    "nao_atende": 0.0
+  },
+  "status_excluidos_do_score": ["nao_aplicavel", "inconclusivo", "nao_avaliado"],
+  "pesos_por_classificacao": {
+    "essencial": 3,
+    "obrigatoria": 2,
+    "recomendada": 1
+  },
+  "pesos_por_criterio": {},
+  "confianca_minima": 0.5,
+  "cobertura_minima_para_ranking": 0.6,
+  "faixas": [
+    {"nome": "Elevado", "minimo": 85, "exige_essenciais": true},
+    {"nome": "Intermediário", "minimo": 60, "exige_essenciais": false},
+    {"nome": "Básico", "minimo": 30, "exige_essenciais": false},
+    {"nome": "Inicial", "minimo": 0.01, "exige_essenciais": false},
+    {"nome": "Inexistente", "minimo": 0, "exige_essenciais": false}
+  ],
+  "atualizacao_dias": {
+    "despesa": {"atende": 7, "parcial": 45},
+    "receita": {"atende": 7, "parcial": 45},
+    "padrao": {"atende": 60, "parcial": 180}
+  },
+  "coleta": {
+    "max_paginas": 40,
+    "max_profundidade": 3,
+    "intervalo_segundos": 1.0,
+    "timeout_segundos": 20,
+    "max_bytes": 3000000,
+    "tentativas": 3,
+    "falhas_consecutivas_para_abortar": 5,
+    "respeitar_robots": true
+  }
+}

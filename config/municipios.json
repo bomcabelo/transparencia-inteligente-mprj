@@ -1,32 +1,82 @@
 [
   {
+    "id": "duque-de-caxias",
     "nome": "Duque de Caxias",
+    "entidade": "Prefeitura Municipal de Duque de Caxias",
+    "tipo": "executivo_municipal",
+    "municipio": "Duque de Caxias",
     "uf": "RJ",
     "site": "https://portal.duquedecaxias.rj.gov.br/",
-    "portal": null
+    "portal": null,
+    "ativo": true
   },
   {
+    "id": "japeri",
     "nome": "Japeri",
+    "entidade": "Prefeitura Municipal de Japeri",
+    "tipo": "executivo_municipal",
+    "municipio": "Japeri",
     "uf": "RJ",
     "site": "https://japeri.rj.gov.br/",
-    "portal": null
+    "portal": "https://japeri.geosiap.net.br/portal-transparencia",
+    "geosiap": {"id_entidade": 10},
+    "ativo": true
   },
   {
+    "id": "itaborai",
     "nome": "Itaboraí",
+    "entidade": "Prefeitura Municipal de Itaboraí",
+    "tipo": "executivo_municipal",
+    "municipio": "Itaboraí",
     "uf": "RJ",
     "site": "https://site.ib.itaborai.rj.gov.br/",
-    "portal": null
+    "portal": null,
+    "ativo": true
   },
   {
+    "id": "cachoeiras-de-macacu",
     "nome": "Cachoeiras de Macacu",
+    "entidade": "Prefeitura Municipal de Cachoeiras de Macacu",
+    "tipo": "executivo_municipal",
+    "municipio": "Cachoeiras de Macacu",
     "uf": "RJ",
     "site": "https://www.prefeituracachoeiras.com/",
-    "portal": null
+    "portal": null,
+    "ativo": true
   },
   {
+    "id": "rio-de-janeiro",
     "nome": "Rio de Janeiro",
+    "entidade": "Prefeitura da Cidade do Rio de Janeiro",
+    "tipo": "executivo_municipal",
+    "municipio": "Rio de Janeiro",
     "uf": "RJ",
     "site": "https://prefeitura.rio/",
-    "portal": "https://transparencia.prefeitura.rio/"
+    "portal": "https://transparencia.prefeitura.rio/",
+    "ativo": true
+  },
+  {
+    "id": "niteroi",
+    "nome": "Niterói",
+    "entidade": "Prefeitura Municipal de Niterói",
+    "tipo": "executivo_municipal",
+    "municipio": "Niterói",
+    "uf": "RJ",
+    "site": "https://www.niteroi.rj.gov.br/",
+    "portal": null,
+    "ativo": false,
+    "observacao": "Extensão opcional do desafio. Ativar após confirmar o domínio oficial."
+  },
+  {
+    "id": "marica",
+    "nome": "Maricá",
+    "entidade": "Prefeitura Municipal de Maricá",
+    "tipo": "executivo_municipal",
+    "municipio": "Maricá",
+    "uf": "RJ",
+    "site": "https://www.marica.rj.gov.br/",
+    "portal": null,
+    "ativo": false,
+    "observacao": "Extensão opcional do desafio. Ativar após confirmar o domínio oficial."
   }
 ]

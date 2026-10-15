@@ -1,34 +1,13 @@
-# Arquitetura proposta — evolução incremental
+# Arquitetura
 
-## Fluxo previsto
+A arquitetura vigente está em [DOCUMENTACAO_TECNICA.md §2](DOCUMENTACAO_TECNICA.md#2-arquitetura). O modelo de dados está no §12 e a estratégia de escala no §8.
 
-1. **Cadastro de entidades:** município, tipo, domínio oficial, URL do portal e metadados de descoberta.
-2. **Coleta:** HTTP/HTML com limites de requisição e, se indispensável, browser automatizado; PDFs e tabelas entram por extratores específicos.
-3. **Normalização:** armazenar URL, título, texto, data de coleta, hash do conteúdo e documentos associados.
-4. **Avaliação:** regras determinísticas para requisitos objetivos; análise semântica seletiva, com evidências, somente quando necessária.
-5. **Persistência:** SQLite na POC; tabelas de entidades, critérios, execuções, avaliações e evidências. PostgreSQL numa evolução.
-6. **API:** FastAPI publica entidades, resultados e histórico.
-7. **Interface:** Streamlit obtém dados da API, sem acessar diretamente o banco.
+Resumo do fluxo:
 
-## Critérios e explicabilidade
-
-Cada critério deve ter código de origem, descrição, tipo de entidade aplicável, peso, estratégia de validação, versão da regra e evidência mínima. Não confundir existência de palavra-chave com atendimento do requisito. Registrar URLs, recortes de texto, horários, hashes e eventuais erros.
-
-Estados previstos: atende, parcial, não_atende, não_aplicavel e inconclusivo. Um erro HTTP ou bloqueio de scraping gera inconclusivo, nunca não_atende automaticamente.
-
-## Pontuação proposta (a validar com o checklist)
-
-Score = 100 × soma(peso × nota) / soma(pesos considerados), considerando apenas critérios aplicáveis e conclusivos.
-Notas propostas: atende=1; parcial=0,5; não_atende=0. Mostrar também percentual de cobertura, critérios inconclusivos e data. Não comparar entidades com coberturas muito diferentes sem ressalvas.
-
-## Expansão para milhares de portais
-
-Separar coleta, extração, avaliação e API. Introduzir filas, agendador, workers isolados, políticas de rate-limit por domínio, reprocessamento idempotente e armazenamento de objetos. Priorizar regras baratas; reservar IA para ambiguidade semântica. Monitorar custos e falsos positivos por revisão humana amostral.
-
-## Limitações atuais
-
-Somente esqueleto inicial implementado. Não há crawler, critérios cadastrados, pontuação, persistência ou diagnóstico real dos municípios. Os indicadores permanecerão vazios até que avaliações reais sejam executadas.
-
-## Próximas etapas
-
-Importar checklist recebido; mapear tipos de entidade e critérios; confirmar domínios oficiais; testar coleta; implementar regras e persistência; obter resultados rastreáveis; validar manualmente uma amostra.
+1. **Cadastro** (`config/municipios.json`): entidade, tipo, site e portal (opcional, descoberto na capa).
+2. **Coleta** (`src/fetch.py`, `src/collector.py`): crawler focado, educado e com circuit breaker. O HTML é guardado como snapshot endereçado por SHA-256.
+3. **Fornecedor** (`src/fingerprint.py`, `src/adapters/`): identificação da tecnologia e sondas de API (GeoSIAP).
+4. **Avaliação** (`src/engine.py`, `src/rules/`): uma regra por critério, com evidências e confiança. IA opcional para critérios semânticos.
+5. **Pontuação** (`src/scoring.py`): score ponderado com intervalo e cobertura.
+6. **Persistência** (`src/repository.py`): histórico imutável, diff e reprocessamento sem rede.
+7. **API** (`api/main.py`) → **Dashboard** (`app/dashboard.py`).
