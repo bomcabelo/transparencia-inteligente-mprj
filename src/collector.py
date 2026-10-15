@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from urllib.parse import urldefrag, urlsplit
 
 from src.fetch import Fetcher, FetchResult, utc_now
-from src.fingerprint import detect
+from src.fingerprint import VENDOR_URL, detect
 from src.page import DOC_EXT, Page, norm, parse_html
 from src.themes import THEMES, classify_page, link_themes
 
@@ -42,9 +42,9 @@ class Collection:
         target = self.site_url if role == "site" else self.portal_url
         if not target:
             return None
-        key = target.rstrip("/")
-        for p in self.pages:
-            if p.depth == 0 and (p.url.rstrip("/") == key):
+        key = _key(target)
+        for p in self.pages:  # semente (depth 0) ou página já visitada antes de virar portal
+            if key in (_key(p.url), _key(p.final_url)):
                 return p
         return None
 
@@ -110,23 +110,36 @@ def _base_host(url: str | None) -> str | None:
     return host.removeprefix("www.") or None
 
 
-def find_portal_link(home: Page) -> tuple[str | None, list[dict]]:
-    candidates = []
+def find_portal_link(home: Page, extra_pages: list[Page] | None = None) -> tuple[str | None, list[dict]]:
+    """Melhor candidato a portal da transparência: na capa e, se preciso, nas demais páginas.
+
+    Pontua rótulo "transparência", URL com "transparencia" e domínio de fornecedor de
+    portal conhecido (Agili, Betha, IPM, Fiorilli, GeoSIAP...). Links da capa valem mais.
+    Âncoras para a própria capa (ex.: "#transparencia") são ignoradas.
+    """
     home_keys = {_key(home.url), _key(home.final_url)}
-    for link in home.links:
-        if _key(link["url"]) in home_keys:  # âncora "#transparencia" ou link para a própria capa
-            continue
-        label, url = norm(link["text"]), norm(link["url"])
-        score = 0
-        if "portal da transparencia" in label:
-            score += 5
-        elif "transparencia" in label:
-            score += 3
-        if "transparencia" in url:
-            score += 2
-        if score:
-            candidates.append({**link, "score": score})
-    candidates.sort(key=lambda c: -c["score"])
+    best: dict[str, dict] = {}
+    for page in [home] + list(extra_pages or []):
+        for link in page.links:
+            key = _key(link["url"])
+            if key in home_keys:
+                continue
+            label, url = norm(link["text"]), norm(link["url"])
+            score = 0
+            if VENDOR_URL.search(urlsplit(link["url"]).hostname or "") and \
+                    re.search(r"transpar|portal|receita|despesa|contas", f"{label} {url}"):
+                score += 3
+            if "portal da transparencia" in label:
+                score += 5
+            elif "transparencia" in label:
+                score += 3
+            if "transparencia" in url:
+                score += 2
+            if page is not home:
+                score -= 1
+            if score > 0 and score > best.get(key, {}).get("score", 0):
+                best[key] = {**link, "score": score, "pagina": page.final_url}
+    candidates = sorted(best.values(), key=lambda c: -c["score"])
     return (candidates[0]["url"] if candidates else None), candidates[:10]
 
 
@@ -246,20 +259,50 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
 
     crawl()
     home = col.page("site")
-    if home and home.status == 200 and len(home.links) < 40:
+    home = home if home and home.status == 200 else None
+    if home and len(home.links) < 40:
         col.notes.append(f"Capa com só {len(home.links)} links no HTML: menu provavelmente montado por "
                          "JavaScript (considere render_js=true para esta entidade).")
-    # Plano B: navegação pela capa não alcançou o mínimo -> usar sitemaps.
+    def adopt_portal(source: str) -> None:
+        """Procura o portal em todas as páginas já coletadas e, se achar, passa a navegá-lo."""
+        if col.portal_url or not home or home.status != 200:
+            return
+        url, cands = find_portal_link(home, [p for p in col.ok_pages if p is not home])
+        if url:
+            col.portal_url, col.portal_source = url, source
+            allowed.add(scope(url))
+            col.notes.append(f"Portal encontrado em {cands[0].get('pagina', home.final_url)}: {url}")
+            visit(url, 0)
+            crawl()
+
+    adopt_portal("descoberto_no_site")
+    # Plano B: navegação não alcançou o mínimo -> usar sitemaps, com diversidade.
     if not col.aborted and len(col.ok_pages) < 10 and len(col.pages) < max_pages and site:
         roots = [u for u in dict.fromkeys([site, col.portal_url]) if u]
         found = [u for u in sitemap_urls(fetcher, roots) if allowed_host(u) and not SKIP.search(u)
                  and not DOC_EXT.search(u)]
-        themed = [(sum(link_themes({"text": "", "url": u}).values()), u) for u in found]
-        themed = [(p, u) for p, u in themed if p > 0]
-        for priority, url in themed:
-            push(url, 1, priority)
-        col.notes.append(f"Sitemap consultado: {len(found)} URLs no domínio, {len(themed)} com temas do checklist.")
+        picked, per_theme, posts = [], {}, 0
+        ranked = []
+        for u in found:
+            themes = link_themes({"text": "", "url": u})
+            if not themes:
+                continue
+            slug = urlsplit(u).path.rstrip("/").rsplit("/", 1)[-1]
+            if slug.count("-") > 5 or re.search(r"/20\d\d/|\d{4,}", urlsplit(u).path):
+                posts += 1  # cara de notícia/post (título longo ou data/número no caminho)
+                continue
+            depth = urlsplit(u).path.strip("/").count("/")
+            ranked.append((sum(themes.values()) / (1 + slug.count("-") / 3 + depth / 2),
+                           max(themes, key=themes.get), u))
+        for priority, theme, u in sorted(ranked, key=lambda x: -x[0]):
+            if per_theme.get(theme, 0) < 3:  # no máximo 3 URLs por tema: cobre mais temas
+                per_theme[theme] = per_theme.get(theme, 0) + 1
+                picked.append(u)
+                push(u, 1, priority)
+        col.notes.append(f"Sitemap consultado: {len(found)} URLs no domínio; {posts} descartadas por parecerem "
+                         f"notícias; {len(picked)} selecionadas ({', '.join(sorted(per_theme))}).")
         crawl()
+        adopt_portal("descoberto_via_sitemap")
 
     col.vendors = detect(col.ok_pages)
     col.finished_at = utc_now()

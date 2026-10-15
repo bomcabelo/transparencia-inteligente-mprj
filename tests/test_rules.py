@@ -116,3 +116,34 @@ def test_sitemap_fallback_when_home_menu_is_not_in_html():
     assert col.portal_url is None                      # âncora "#transparencia" não é o portal
     assert len(col.ok_pages) == 11 and "https://p.rj.gov.br/noticias/x" not in f.calls
     assert any("Sitemap consultado" in n for n in col.notes) and any("JavaScript" in n for n in col.notes)
+
+
+def test_portal_found_outside_home_and_vendor_signature_is_strict():
+    from src.fingerprint import detect
+    home = ('<html><title>Prefeitura</title><a href="https://p.rj.gov.br/acesso-a-informacao">Acesso à Informação</a>'
+            '<p>Gestão com agilidade.</p></html>')
+    info = ('<html><title>Acesso à Informação</title>'
+            '<a href="https://p.agilicloud.com.br/transparencia">Portal da Transparência</a></html>')
+    pages = {"https://p.rj.gov.br": home, "https://p.rj.gov.br/acesso-a-informacao": info,
+             "https://p.agilicloud.com.br/transparencia": "<html><title>Portal da Transparência</title></html>"}
+    entity = {"id": "p", "nome": "P", "tipo": "executivo_municipal", "site": "https://p.rj.gov.br", "portal": None}
+    col = collect(entity, FixtureFetcher(pages))
+    assert col.portal_url == "https://p.agilicloud.com.br/transparencia"
+    assert col.portal_source == "descoberto_no_site" and col.health["portal_ok"] is True
+    assert "Agili" not in detect([col.page("site")])  # "agilidade" não é o fornecedor
+
+
+def test_sitemap_skips_news_posts_and_diversifies_themes():
+    posts = [f"aviso-de-licitacao-pregao-presencial-n-o-{i:03d}-2024" for i in range(30)]
+    good = ["despesas", "receitas", "licitacoes", "contratos", "e-sic", "lgpd", "dados-abertos", "ouvidoria",
+            "servidores", "diarias", "obras"]
+    sitemap = "<urlset>" + "".join(f"<url><loc>https://q.rj.gov.br/{p}</loc></url>" for p in posts + good) + "</urlset>"
+    pages = {"https://q.rj.gov.br": "<html><title>Q</title></html>",
+             "https://q.rj.gov.br/sitemap.xml": (200, sitemap, "application/xml")}
+    for p in posts + good:
+        pages[f"https://q.rj.gov.br/{p}"] = f"<html><title>{p}</title></html>"
+    entity = {"id": "q", "nome": "Q", "tipo": "executivo_municipal", "site": "https://q.rj.gov.br", "portal": None}
+    f = FixtureFetcher(pages)
+    collect(entity, f)
+    assert not any("aviso-de-licitacao" in c for c in f.calls)
+    assert all(f"https://q.rj.gov.br/{p}" in f.calls for p in good)
