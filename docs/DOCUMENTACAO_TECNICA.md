@@ -271,7 +271,8 @@ O custo é dominado pela rede e é linear no número de entidades. Não há comp
 | Situação | Comportamento |
 |---|---|
 | DNS, timeout, conexão recusada | Nova tentativa com backoff exponencial; erro registrado em `pages`/`errors`; critérios dependentes → `inconclusivo` |
-| HTTP 429 / 5xx | Respeita `Retry-After`; nova tentativa; depois, falha registrada |
+| HTTP 429 / 503 (limite de acesso, firewall) | **Não insiste**: no máximo uma nova tentativa, e só se o servidor informar `Retry-After` ≤ 30 s. A coleta da entidade é interrompida na hora (sem sitemap nem outras páginas), e os critérios ficam `inconclusivo` até a próxima execução |
+| HTTP 500/502/504 | Erro transitório: nova tentativa com backoff exponencial; depois, falha registrada |
 | HTTP 404 em link interno | Registrado, sem contar para o circuit breaker (link quebrado é dado, não instabilidade) |
 | robots.txt proíbe | Página não acessada (`bloqueado_por_robots_txt`); critério → `inconclusivo` |
 | Redirecionamento para endereço interno ou privado | Bloqueado (proteção contra SSRF) |
@@ -382,6 +383,7 @@ Status sempre com ícone e rótulo, nunca só cor. Tema escuro em `.streamlit/co
 - **Pesos e limites** (pesos 3/2/1, 7/45 dias, faixas) são propostas defensáveis, mas precisam de validação com especialistas do GATE/MPRJ. Estão em configuração justamente por isso.
 - **Confiança heurística**, ainda não calibrada contra avaliação humana (§5.4).
 - **Validação real.** Os testes automatizados usam um portal sintético (`src/demo.py`) e HTML controlado. A execução contra os sete municípios deve ser feita no ambiente do avaliador (`python -m src.pipeline run`), e as primeiras execuções precisam de revisão manual das evidências, com a planilha de validação (§5.5).
+- **Bloqueio por firewall.** Em 15/10/2026, o firewall do site de Itaboraí (Wordfence) bloqueou o IP do avaliador depois de execuções seguidas: capa, sitemap e cerca de 40 páginas em menos de uma hora, com intervalo de 1 s. A versão então vigente insistia 3 vezes em respostas 503. Correções: parar ao primeiro sinal de limite, intervalo e número máximo de páginas configuráveis por entidade (Itaboraí: 5 s e 25 páginas) e nunca contornar o bloqueio. Em produção, o mesmo vale com mais força: token bucket por domínio, janelas noturnas e IP institucional identificado, com contato publicado.
 - **Assinaturas de fornecedor** são padrões textuais e podem gerar falso positivo. A primeira versão marcava "Agili" em qualquer texto com "agilidade"; hoje as assinaturas exigem palavra inteira ou domínio.
 - **Domínios oficiais** de Niterói e Maricá estão cadastrados como inativos até confirmação.
 

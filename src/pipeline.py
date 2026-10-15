@@ -32,9 +32,10 @@ log = logging.getLogger("pipeline")
 
 def make_fetcher(methodology: dict, entity: dict | None = None) -> Fetcher:
     c = methodology["coleta"]
-    base = HttpFetcher(delay=c["intervalo_segundos"], timeout=c["timeout_segundos"], max_bytes=c["max_bytes"],
+    e = entity or {}
+    base = HttpFetcher(delay=float(e.get("intervalo_segundos", c["intervalo_segundos"])), timeout=c["timeout_segundos"], max_bytes=c["max_bytes"],
                        retries=c["tentativas"], respect_robots=c["respeitar_robots"])
-    if os.environ.get("MPRJ_RENDER_JS") == "1" or (entity or {}).get("render_js"):
+    if os.environ.get("MPRJ_RENDER_JS") == "1" or e.get("render_js"):
         try:
             from src.fetch import PlaywrightFetcher
             return PlaywrightFetcher(base, screenshot_dir=str(repo.SNAPSHOTS / "_screenshots"))
@@ -47,7 +48,7 @@ def assess(entity: dict, fetcher: Fetcher, *, methodology: dict, catalog: dict, 
            probes: bool = True) -> tuple[Collection, list, dict, list]:
     c = methodology["coleta"]
     try:
-        col = collect(entity, fetcher, max_pages=c["max_paginas"], max_depth=c["max_profundidade"],
+        col = collect(entity, fetcher, max_pages=int(entity.get("max_paginas", c["max_paginas"])), max_depth=c["max_profundidade"],
                       abort_after=c["falhas_consecutivas_para_abortar"])
     finally:
         if hasattr(fetcher, "close"):  # fecha o navegador na mesma thread que o abriu

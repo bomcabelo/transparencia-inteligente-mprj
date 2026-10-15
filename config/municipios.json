@@ -37,7 +37,9 @@
     "portal": null,
     "ativo": true,
     "render_js": true,
-    "observacao": "Menu da capa fora do HTML estático (29 links na execução de 15/10/2026)."
+    "observacao": "Menu da capa fora do HTML estático (29 links em 15/10/2026). Firewall do site (Wordfence) bloqueou o IP após coletas seguidas: intervalo de 5 s e no máximo 25 páginas por execução.",
+    "intervalo_segundos": 5,
+    "max_paginas": 25
   },
   {
     "id": "cachoeiras-de-macacu",

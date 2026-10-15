@@ -90,7 +90,7 @@ O dashboard consulta a API em `MPRJ_API_URL` (padrão `http://127.0.0.1:8000`).
 
 | Variável / arquivo | Efeito |
 |---|---|
-| `config/municipios.json` | Entidades, tipo, site, portal e `ativo`. Niterói e Maricá estão inativos até confirmar o domínio |
+| `config/municipios.json` | Entidades, tipo, site, portal e `ativo`. Por entidade, também `render_js`, `intervalo_segundos` e `max_paginas` (para sites com firewall sensível). Niterói e Maricá estão inativos até confirmar o domínio |
 | `config/metodologia.json` | Pesos, faixas de classificação, confiança mínima, limites de atualização, orçamento de coleta |
 | `MPRJ_DB_PATH` | Caminho do banco SQLite (padrão `data/transparencia.sqlite3`) |
 | `MPRJ_RENDER_JS=1` ou `"render_js": true` na entidade | Renderiza JavaScript com Playwright (para todas as entidades ou só para uma) e salva screenshots. Requer `pip install -r requirements-opcional.txt` e `python -m playwright install chromium` |

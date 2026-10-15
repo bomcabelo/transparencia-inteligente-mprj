@@ -47,6 +47,7 @@ class FetchResult:
     truncated: bool = False
     renderer: str = "http"
     screenshot_path: str | None = None
+    rate_limited: bool = False  # servidor sinalizou limite (429/503): não insistir
 
     @property
     def ok(self) -> bool:
@@ -160,15 +161,23 @@ class HttpFetcher:
                 result.error = f"erro_rede:{type(exc).__name__}"
                 time.sleep(min(2 ** attempt, 8))
                 continue
-            if resp.status_code == 429 or resp.status_code >= 500:
+            if resp.status_code in (429, 503):
+                # Limite de acesso (rate limit, firewall como Wordfence, manutenção). Insistir agrava o
+                # bloqueio: só tenta de novo uma vez, e apenas se o servidor disser quando (Retry-After ≤ 30 s).
                 retry_after = resp.headers.get("retry-after", "")
                 resp.close()
-                result.status = resp.status_code
-                result.error = f"http_{resp.status_code}"
-                pause = float(retry_after) if retry_after.isdigit() else 2 ** attempt
-                time.sleep(min(pause, 30))
+                result.status, result.error = resp.status_code, f"limite_do_servidor_http_{resp.status_code}"
+                result.rate_limited = True
+                if attempt == 0 and retry_after.isdigit() and int(retry_after) <= 30:
+                    time.sleep(int(retry_after))
+                    continue
+                return None
+            if resp.status_code >= 500:  # erro transitório do servidor: backoff exponencial
+                resp.close()
+                result.status, result.error = resp.status_code, f"http_{resp.status_code}"
+                time.sleep(min(2 ** attempt, 8))
                 continue
-            result.error = None
+            result.error, result.rate_limited = None, False
             return resp
         return None
 

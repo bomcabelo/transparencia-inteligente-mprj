@@ -147,7 +147,7 @@ _LOC = re.compile(r"<loc>\s*([^<\s]+)\s*</loc>", re.I)
 SITEMAP_PATHS = ("/sitemap.xml", "/sitemap_index.xml", "/wp-sitemap.xml")
 
 
-def sitemap_urls(fetcher: Fetcher, roots: list[str], *, max_files: int = 8) -> list[str]:
+def sitemap_urls(fetcher: Fetcher, roots: list[str], *, max_files: int = 4) -> list[str]:
     """URLs listadas nos sitemaps (robots.txt `Sitemap:` + caminhos usuais).
 
     Plano B quando o menu da capa é montado por JavaScript ou tem poucos links: o
@@ -169,6 +169,8 @@ def sitemap_urls(fetcher: Fetcher, roots: list[str], *, max_files: int = 8) -> l
             continue
         seen_files.add(url)
         res = fetcher.fetch(url)
+        if res.rate_limited:
+            break
         if res.status != 200 or not res.body:
             continue
         for loc in _LOC.findall(res.body.decode("utf-8", "ignore")):
@@ -207,6 +209,9 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
         nonlocal consecutive_failures
         seen.add(_key(url))
         result: FetchResult = fetcher.fetch(url)
+        if result.rate_limited or result.status in (429, 503):
+            col.aborted = (f"Servidor sinalizou limite de acesso (HTTP {result.status}) em {url}: coleta "
+                           "interrompida para não agravar o bloqueio; nova tentativa na próxima execução.")
         if not result.ok or not result.is_html:
             consecutive_failures += 0 if result.status == 404 else 1
             col.errors.append({"url": url, "status": result.status, "error": result.error or
@@ -244,11 +249,11 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
             if portal:
                 col.portal_url, col.portal_source = portal, "descoberto_na_capa"
                 allowed.add(scope(portal))
-    if col.portal_url and _key(col.portal_url) not in seen:
+    if col.portal_url and _key(col.portal_url) not in seen and not col.aborted:
         visit(col.portal_url, 0)
 
     def crawl() -> None:
-        while queue and len(col.pages) < max_pages:
+        while queue and len(col.pages) < max_pages and not col.aborted:
             if consecutive_failures >= abort_after:
                 col.aborted = f"{consecutive_failures} falhas consecutivas: coleta interrompida (circuit breaker)"
                 break
@@ -265,7 +270,7 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
                          "JavaScript (considere render_js=true para esta entidade).")
     def adopt_portal(source: str) -> None:
         """Procura o portal em todas as páginas já coletadas e, se achar, passa a navegá-lo."""
-        if col.portal_url or not home or home.status != 200:
+        if col.portal_url or not home or col.aborted:
             return
         url, cands = find_portal_link(home, [p for p in col.ok_pages if p is not home])
         if url:
@@ -277,7 +282,7 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
 
     adopt_portal("descoberto_no_site")
     # Plano B: navegação não alcançou o mínimo -> usar sitemaps, com diversidade.
-    if not col.aborted and len(col.ok_pages) < 10 and len(col.pages) < max_pages and site:
+    if not col.aborted and home and len(col.ok_pages) < 10 and len(col.pages) < max_pages:
         roots = [u for u in dict.fromkeys([site, col.portal_url]) if u]
         found = [u for u in sitemap_urls(fetcher, roots) if allowed_host(u) and not SKIP.search(u)
                  and not DOC_EXT.search(u)]
