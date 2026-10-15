@@ -30,11 +30,11 @@ from src.scoring import compute
 log = logging.getLogger("pipeline")
 
 
-def make_fetcher(methodology: dict) -> Fetcher:
+def make_fetcher(methodology: dict, entity: dict | None = None) -> Fetcher:
     c = methodology["coleta"]
     base = HttpFetcher(delay=c["intervalo_segundos"], timeout=c["timeout_segundos"], max_bytes=c["max_bytes"],
                        retries=c["tentativas"], respect_robots=c["respeitar_robots"])
-    if os.environ.get("MPRJ_RENDER_JS") == "1":
+    if os.environ.get("MPRJ_RENDER_JS") == "1" or (entity or {}).get("render_js"):
         try:
             from src.fetch import PlaywrightFetcher
             return PlaywrightFetcher(base, screenshot_dir=str(repo.SNAPSHOTS / "_screenshots"))
@@ -66,14 +66,15 @@ def run(entity_ids: list[str] | None = None, *, workers: int = 3, trigger: str =
     if entity_ids:
         pool = [e for e in pool if e["id"] in set(entity_ids)]
     llm = LLMJudge.from_env()
-    factory = fetcher_factory or (lambda: make_fetcher(methodology))
+    def factory(entity: dict) -> Fetcher:
+        return fetcher_factory() if fetcher_factory else make_fetcher(methodology, entity)
     with repo.connect(db_path) as db:
         repo.sync_catalog(db, catalog, REGISTRY)
         run_id = repo.start_run(db, trigger, methodology["versao"], catalog["versao"], utc_now())
         ids = {e["id"]: repo.upsert_entity(db, e) for e in pool}
     ok = 0
     with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
-        futures = {ex.submit(assess, e, factory(), methodology=methodology, catalog=catalog, llm=llm,
+        futures = {ex.submit(assess, e, factory(e), methodology=methodology, catalog=catalog, llm=llm,
                              probes=probes): e for e in pool}
         for fut in as_completed(futures):
             entity = futures[fut]
@@ -137,6 +138,8 @@ def diagnose(slug: str, db_path=None) -> None:
     print(f"  páginas válidas: {h.get('paginas_ok')}  erros: {h.get('paginas_com_erro')}  "
           f"dinâmicas (JS): {h.get('paginas_dinamicas')}  fornecedor: {', '.join(a['vendors'] or {}) or '—'}")
     print(f"  temas encontrados: {', '.join(h.get('temas_cobertos') or []) or 'nenhum'}")
+    for note in h.get("notas") or []:
+        print(f"  NOTA: {note}")
     print(f"  score: {a['score']}  intervalo: [{a['score_min']}–{a['score_max']}]  cobertura: {a['cobertura_avaliacao']}")
     print("\n  Páginas coletadas:")
     for p in col.pages:

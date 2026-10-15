@@ -98,3 +98,21 @@ def test_vendor_hosted_portal_does_not_open_other_municipalities():
     collect(entity, f)
     assert "https://outra.vendor.net.br/despesas" not in f.calls
     assert "https://japeri.vendor.net.br/despesas" in f.calls
+
+
+def test_sitemap_fallback_when_home_menu_is_not_in_html():
+    home = '<html><title>Prefeitura</title><a href="#transparencia">Transparência</a></html>'
+    sitemap = ("<urlset>" + "".join(f"<url><loc>https://p.rj.gov.br/{p}</loc></url>" for p in
+               ["despesas", "receitas", "licitacoes", "contratos", "noticias/x", "e-sic", "ouvidoria",
+                "lgpd", "dados-abertos", "planejamento-rgf", "servidores"]) + "</urlset>")
+    pages = {"https://p.rj.gov.br": home,
+             "https://p.rj.gov.br/sitemap.xml": (200, sitemap, "application/xml")}
+    for p in ["despesas", "receitas", "licitacoes", "contratos", "e-sic", "ouvidoria", "lgpd", "dados-abertos",
+              "planejamento-rgf", "servidores"]:
+        pages[f"https://p.rj.gov.br/{p}"] = f"<html><title>{p}</title></html>"
+    entity = {"id": "p", "nome": "P", "tipo": "executivo_municipal", "site": "https://p.rj.gov.br", "portal": None}
+    f = FixtureFetcher(pages)
+    col = collect(entity, f)
+    assert col.portal_url is None                      # âncora "#transparencia" não é o portal
+    assert len(col.ok_pages) == 11 and "https://p.rj.gov.br/noticias/x" not in f.calls
+    assert any("Sitemap consultado" in n for n in col.notes) and any("JavaScript" in n for n in col.notes)

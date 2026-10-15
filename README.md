@@ -93,7 +93,7 @@ O dashboard consulta a API em `MPRJ_API_URL` (padrão `http://127.0.0.1:8000`).
 | `config/municipios.json` | Entidades, tipo, site, portal e `ativo`. Niterói e Maricá estão inativos até confirmar o domínio |
 | `config/metodologia.json` | Pesos, faixas de classificação, confiança mínima, limites de atualização, orçamento de coleta |
 | `MPRJ_DB_PATH` | Caminho do banco SQLite (padrão `data/transparencia.sqlite3`) |
-| `MPRJ_RENDER_JS=1` | Renderiza JavaScript com Playwright e salva screenshots. Requer `pip install -r requirements-opcional.txt` e `python -m playwright install chromium` |
+| `MPRJ_RENDER_JS=1` ou `"render_js": true` na entidade | Renderiza JavaScript com Playwright (para todas as entidades ou só para uma) e salva screenshots. Requer `pip install -r requirements-opcional.txt` e `python -m playwright install chromium` |
 | `MPRJ_LLM_PROVIDER`, `MPRJ_LLM_MODEL`, `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, `MPRJ_LLM_MAX_CALLS` | Ativa a camada de IA opcional (§11 da documentação) |
 
 ## API

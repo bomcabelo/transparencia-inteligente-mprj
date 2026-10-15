@@ -221,7 +221,7 @@ Faixas configuráveis: **Elevado ≥ 85, Intermediário ≥ 60, Básico ≥ 30, 
 
 ### 6.4 Comparabilidade
 
-- Com **cobertura da avaliação abaixo de 30%** (`cobertura_minima_para_score`), não se publica score pontual: a classificação é "Cobertura insuficiente" e só o intervalo é exibido. Na primeira execução real, Duque de Caxias apareceu com 100% calculado sobre 5% de cobertura, porque um único critério foi decidido. Essa regra foi criada a partir desse caso.
+- Com **cobertura da avaliação abaixo de 50%** (`cobertura_minima_para_score`), não se publica score pontual: a classificação é "Cobertura insuficiente" e só o intervalo é exibido. Na primeira execução real, Duque de Caxias apareceu com 100% calculado sobre 5% de cobertura, porque um único critério foi decidido. Essa regra foi criada a partir desse caso. O limite começou em 30% e subiu para 50% quando Itaboraí, na execução seguinte, recebeu 89,5% com intervalo de 27% a 97% e cobertura de 30%: um número que não informava nada.
 - O ranking só compara entidades com **cobertura da avaliação ≥ 60%** (`cobertura_minima_para_ranking`). As demais aparecem com aviso.
 - Cada avaliação grava `methodology_version` e `checklist_version`. Mudou peso ou regra: as avaliações antigas são **reprocessadas** a partir dos snapshots, para manter a série comparável.
 - O score é sempre publicado com intervalo e cobertura. "62% (55–71%, cobertura 80%)" é honesto. "62%" sozinho não é.
@@ -297,6 +297,7 @@ O custo é dominado pela rede e é linear no número de entidades. Não há comp
 | O portal mudou de endereço ou fornecedor? | `portal_url`, `portal_source` e `vendors` em cada avaliação |
 
 - **Escopo de navegação.** O crawler segue links de todo o domínio institucional da prefeitura (ex.: `duquedecaxias.rj.gov.br` e qualquer subdomínio, como `portal.`, `transparencia.`, `esic.`). Portais hospedados em domínio de fornecedor (ex.: `japeri.geosiap.net.br`) são seguidos só pelo host exato, para não entrar no portal de outro município do mesmo fornecedor. Esse ajuste também veio da primeira execução real: Duque de Caxias e Itaboraí tinham o cadastro em subdomínio (`portal.`, `site.ib.`) e o robô descartava os demais subdomínios da própria prefeitura.
+- **Plano B por sitemap.** Se a navegação pela capa não alcança 10 páginas válidas (menu montado por JavaScript, poucos links no HTML), o robô lê os sitemaps do site (`Sitemap:` do robots.txt, `/sitemap.xml`, `/wp-sitemap.xml`) e prioriza as URLs com temas do checklist. Capas com menos de 40 links geram um aviso sugerindo `render_js: true` para a entidade no cadastro. As decisões ficam registradas nas notas da coleta (`python -m src.pipeline diagnostico`).
 - **Mudança de endereço.** Se o portal não está cadastrado, o crawler o descobre pelo link "Transparência" da capa (`portal_source = descoberto_na_capa`). Assim, uma troca de endereço é absorvida e registrada.
 
 ## 11. Inteligência artificial

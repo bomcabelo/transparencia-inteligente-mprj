@@ -36,6 +36,7 @@ class Collection:
     errors: list[dict] = field(default_factory=list)
     aborted: str | None = None
     vendors: dict = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)  # decisões da coleta (fallbacks, avisos)
 
     def page(self, role: str) -> Page | None:
         target = self.site_url if role == "site" else self.portal_url
@@ -64,6 +65,7 @@ class Collection:
             "temas_cobertos": covered,
             "temas_nao_encontrados": sorted(set(THEMES) - set(covered)),
             "abortada": self.aborted,
+            "notas": self.notes,
         }
 
     @property
@@ -110,7 +112,10 @@ def _base_host(url: str | None) -> str | None:
 
 def find_portal_link(home: Page) -> tuple[str | None, list[dict]]:
     candidates = []
+    home_keys = {_key(home.url), _key(home.final_url)}
     for link in home.links:
+        if _key(link["url"]) in home_keys:  # âncora "#transparencia" ou link para a própria capa
+            continue
         label, url = norm(link["text"]), norm(link["url"])
         score = 0
         if "portal da transparencia" in label:
@@ -123,6 +128,39 @@ def find_portal_link(home: Page) -> tuple[str | None, list[dict]]:
             candidates.append({**link, "score": score})
     candidates.sort(key=lambda c: -c["score"])
     return (candidates[0]["url"] if candidates else None), candidates[:10]
+
+
+_LOC = re.compile(r"<loc>\s*([^<\s]+)\s*</loc>", re.I)
+SITEMAP_PATHS = ("/sitemap.xml", "/sitemap_index.xml", "/wp-sitemap.xml")
+
+
+def sitemap_urls(fetcher: Fetcher, roots: list[str], *, max_files: int = 8) -> list[str]:
+    """URLs listadas nos sitemaps (robots.txt `Sitemap:` + caminhos usuais).
+
+    Plano B quando o menu da capa é montado por JavaScript ou tem poucos links: o
+    sitemap costuma listar todas as páginas do site, inclusive as de transparência.
+    """
+    queue, seen_files, urls = [], set(), []
+    for root in roots:
+        parts = urlsplit(root)
+        origin = f"{parts.scheme}://{parts.netloc}"
+        robots = fetcher.fetch(origin + "/robots.txt")
+        if robots.status == 200:
+            for line in robots.body.decode("utf-8", "ignore").splitlines():
+                if line.lower().startswith("sitemap:"):
+                    queue.append(line.split(":", 1)[1].strip())
+        queue += [origin + p for p in SITEMAP_PATHS]
+    while queue and len(seen_files) < max_files:
+        url = queue.pop(0)
+        if url in seen_files:
+            continue
+        seen_files.add(url)
+        res = fetcher.fetch(url)
+        if res.status != 200 or not res.body:
+            continue
+        for loc in _LOC.findall(res.body.decode("utf-8", "ignore")):
+            (queue if loc.lower().endswith(".xml") else urls).append(loc)
+    return list(dict.fromkeys(urls))
 
 
 def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: int = 3,
@@ -196,14 +234,32 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
     if col.portal_url and _key(col.portal_url) not in seen:
         visit(col.portal_url, 0)
 
-    while queue and len(col.pages) < max_pages:
-        if consecutive_failures >= abort_after:
-            col.aborted = f"{consecutive_failures} falhas consecutivas: coleta interrompida (circuit breaker)"
-            break
-        _, _, url, depth = heapq.heappop(queue)
-        if _key(url) in seen:
-            continue
-        visit(url, depth)
+    def crawl() -> None:
+        while queue and len(col.pages) < max_pages:
+            if consecutive_failures >= abort_after:
+                col.aborted = f"{consecutive_failures} falhas consecutivas: coleta interrompida (circuit breaker)"
+                break
+            _, _, url, depth = heapq.heappop(queue)
+            if _key(url) in seen:
+                continue
+            visit(url, depth)
+
+    crawl()
+    home = col.page("site")
+    if home and home.status == 200 and len(home.links) < 40:
+        col.notes.append(f"Capa com só {len(home.links)} links no HTML: menu provavelmente montado por "
+                         "JavaScript (considere render_js=true para esta entidade).")
+    # Plano B: navegação pela capa não alcançou o mínimo -> usar sitemaps.
+    if not col.aborted and len(col.ok_pages) < 10 and len(col.pages) < max_pages and site:
+        roots = [u for u in dict.fromkeys([site, col.portal_url]) if u]
+        found = [u for u in sitemap_urls(fetcher, roots) if allowed_host(u) and not SKIP.search(u)
+                 and not DOC_EXT.search(u)]
+        themed = [(sum(link_themes({"text": "", "url": u}).values()), u) for u in found]
+        themed = [(p, u) for p, u in themed if p > 0]
+        for priority, url in themed:
+            push(url, 1, priority)
+        col.notes.append(f"Sitemap consultado: {len(found)} URLs no domínio, {len(themed)} com temas do checklist.")
+        crawl()
 
     col.vendors = detect(col.ok_pages)
     col.finished_at = utc_now()

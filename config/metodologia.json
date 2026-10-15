@@ -1,5 +1,5 @@
 {
-  "versao": "metodologia-1.1",
+  "versao": "metodologia-1.2",
   "descricao": "Parâmetros de pontuação. Alterar aqui gera nova versão: avaliações só são comparáveis dentro da mesma versão (ou após reprocessamento).",
   "valor_por_status": {
     "atende": 1.0,
@@ -15,7 +15,7 @@
   "pesos_por_criterio": {},
   "confianca_minima": 0.5,
   "cobertura_minima_para_ranking": 0.6,
-  "cobertura_minima_para_score": 0.3,
+  "cobertura_minima_para_score": 0.5,
   "faixas": [
     {"nome": "Elevado", "minimo": 85, "exige_essenciais": true},
     {"nome": "Intermediário", "minimo": 60, "exige_essenciais": false},
