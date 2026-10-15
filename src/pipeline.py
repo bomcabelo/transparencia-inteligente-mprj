@@ -46,8 +46,14 @@ def make_fetcher(methodology: dict, entity: dict | None = None) -> Fetcher:
 def assess(entity: dict, fetcher: Fetcher, *, methodology: dict, catalog: dict, llm=None,
            probes: bool = True) -> tuple[Collection, list, dict, list]:
     c = methodology["coleta"]
-    col = collect(entity, fetcher, max_pages=c["max_paginas"], max_depth=c["max_profundidade"],
-                  abort_after=c["falhas_consecutivas_para_abortar"])
+    try:
+        col = collect(entity, fetcher, max_pages=c["max_paginas"], max_depth=c["max_profundidade"],
+                      abort_after=c["falhas_consecutivas_para_abortar"])
+    finally:
+        if hasattr(fetcher, "close"):  # fecha o navegador na mesma thread que o abriu
+            fetcher.close()
+    if getattr(fetcher, "rendered", 0):
+        col.notes.append(f"{fetcher.rendered} página(s) renderizada(s) com JavaScript (Playwright).")
     extra, probe_log = {}, []
     if probes and (col.health["site_ok"] or col.health.get("portal_ok")):
         from src.adapters.probes import run_probes

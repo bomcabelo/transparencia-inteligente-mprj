@@ -208,30 +208,58 @@ class FixtureFetcher:
 
 
 class PlaywrightFetcher:
-    """Renderiza JavaScript quando necessário (opcional: `pip install playwright`).
+    """Renderiza JavaScript só quando o HTML estático vem "vazio" (opcional: `pip install playwright`).
 
-    Ativado por MPRJ_RENDER_JS=1. Mantém o mesmo contrato do HttpFetcher e salva
-    screenshot da página como evidência visual.
+    Ativado por MPRJ_RENDER_JS=1 ou por `"render_js": true` na entidade. Decisões:
+    - o navegador é iniciado na PRIMEIRA chamada, na própria thread do worker (a API
+      síncrona do Playwright não pode ser usada fora da thread em que foi criada);
+    - só renderiza páginas com poucos links no HTML estático (SPA) e a primeira página
+      (capa), que ganha screenshot como evidência visual; as demais seguem por HTTP;
+    - espera `load` e, por até 10 s, a rede ficar ociosa (sites com polling nunca ficam);
+    - qualquer falha de renderização mantém o conteúdo estático (nunca piora a coleta).
     """
 
+    MIN_ANCHORS = 15
+
     def __init__(self, base: HttpFetcher, screenshot_dir: str | None = None):
-        from playwright.sync_api import sync_playwright  # import tardio: dependência opcional
+        import playwright.sync_api  # noqa: F401  (falha cedo se a dependência opcional não existe)
 
         self.base = base
         self.screenshot_dir = screenshot_dir
-        self._pw = sync_playwright().start()
-        self._browser = self._pw.chromium.launch()
+        self._pw = self._browser = None
+        self._first = True
+        self.rendered = 0
+
+    def _ensure_browser(self) -> None:
+        if self._browser is None:
+            from playwright.sync_api import sync_playwright
+            self._pw = sync_playwright().start()
+            self._browser = self._pw.chromium.launch()
+
+    def needs_render(self, result: FetchResult) -> bool:
+        return self._first or result.body.lower().count(b"<a ") < self.MIN_ANCHORS
 
     def fetch(self, url: str) -> FetchResult:
         result = self.base.fetch(url)  # política (robots, URL pública) e conteúdo estático
-        if not result.ok or not result.is_html:
+        if not result.ok or not result.is_html or not self.needs_render(result):
             return result
-        page = self._browser.new_page(user_agent=USER_AGENT)
+        first, self._first = self._first, False
         try:
-            page.goto(result.final_url or url, wait_until="networkidle", timeout=45_000)
+            self._ensure_browser()
+            page = self._browser.new_page(user_agent=USER_AGENT)
+        except Exception as exc:
+            result.renderer = f"http(render_indisponivel:{type(exc).__name__})"
+            return result
+        try:
+            page.goto(result.final_url or url, wait_until="load", timeout=45_000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=10_000)
+            except Exception:
+                pass  # site com requisições contínuas: segue com o que já carregou
             result.body = page.content().encode("utf-8")
             result.renderer = "playwright"
-            if self.screenshot_dir:
+            self.rendered += 1
+            if self.screenshot_dir and first:
                 import hashlib
                 os.makedirs(self.screenshot_dir, exist_ok=True)
                 name = hashlib.sha256(url.encode()).hexdigest()[:16] + ".png"
@@ -245,5 +273,7 @@ class PlaywrightFetcher:
         return result
 
     def close(self) -> None:
-        self._browser.close()
-        self._pw.stop()
+        if self._browser is not None:
+            self._browser.close()
+            self._pw.stop()
+            self._browser = self._pw = None

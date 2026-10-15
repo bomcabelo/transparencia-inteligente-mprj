@@ -8,7 +8,9 @@
     "uf": "RJ",
     "site": "https://portal.duquedecaxias.rj.gov.br/",
     "portal": null,
-    "ativo": true
+    "ativo": true,
+    "render_js": true,
+    "observacao": "Capa montada por JavaScript (0 links no HTML na execução de 15/10/2026)."
   },
   {
     "id": "japeri",
@@ -19,7 +21,9 @@
     "uf": "RJ",
     "site": "https://japeri.rj.gov.br/",
     "portal": "https://japeri.geosiap.net.br/portal-transparencia",
-    "geosiap": {"id_entidade": 10},
+    "geosiap": {
+      "id_entidade": 10
+    },
     "ativo": true
   },
   {
@@ -31,7 +35,9 @@
     "uf": "RJ",
     "site": "https://site.ib.itaborai.rj.gov.br/",
     "portal": null,
-    "ativo": true
+    "ativo": true,
+    "render_js": true,
+    "observacao": "Menu da capa fora do HTML estático (29 links na execução de 15/10/2026)."
   },
   {
     "id": "cachoeiras-de-macacu",
