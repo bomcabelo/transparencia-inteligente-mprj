@@ -28,3 +28,10 @@ def test_essential_gap_caps_classification():
 def test_no_conclusive_results_means_no_score():
     s = compute([r("4.1", "inconclusivo")])
     assert s["score"] is None and s["classificacao"] == "Sem avaliação conclusiva" and not s["comparavel"]
+
+
+def test_low_coverage_publishes_interval_but_no_point_score():
+    rows = [r("1.1", "atende")] + [r(c, "inconclusivo") for c in ("1.2", "1.3", "4.1", "3.1", "12.1", "2.4")]
+    s = compute(rows)
+    assert s["score"] is None and s["classificacao"] == "Cobertura insuficiente"
+    assert s["score_intervalo"][0] < s["score_intervalo"][1] and not s["comparavel"]

@@ -57,10 +57,13 @@ def compute(results: list[Result | dict], *, catalog: dict | None = None,
         if crit["classificacao"] == "essencial" and status != "atende":
             essential_gaps.append(r["criterion_id"])
 
-    score = round(100 * num / den, 1) if den else None
+    coverage = round(den / evaluated_w, 3) if evaluated_w else 0.0
+    # Com pouca cobertura, a média de poucos critérios não representa a entidade:
+    # publica-se o intervalo, mas não um score pontual (evita "100%" com 1 critério).
+    insufficient = coverage < m.get("cobertura_minima_para_score", 0)
+    score = round(100 * num / den, 1) if den and not insufficient else None
     lower = round(100 * num / evaluated_w, 1) if evaluated_w else None
     upper = round(100 * (num + inconclusive_w) / evaluated_w, 1) if evaluated_w else None
-    coverage = round(den / evaluated_w, 3) if evaluated_w else 0.0
     categories = sorted(({"categoria": k, "score": round(100 * v["num"] / v["den"], 1),
                           "atende": v["atende"], "parcial": v["parcial"], "nao_atende": v["nao_atende"]}
                          for k, v in groups.items() if v["den"]), key=lambda c: -c["score"])
@@ -71,7 +74,7 @@ def compute(results: list[Result | dict], *, catalog: dict | None = None,
         "cobertura_avaliacao": coverage,
         "cobertura_checklist": round(evaluated_w / applicable_w, 3) if applicable_w else 0.0,
         "comparavel": coverage >= m["cobertura_minima_para_ranking"],
-        "classificacao": classify(score, essential_gaps, m),
+        "classificacao": "Cobertura insuficiente" if insufficient and den else classify(score, essential_gaps, m),
         "essenciais_pendentes": essential_gaps,
         "contagem": counts,
         "categorias": categories,

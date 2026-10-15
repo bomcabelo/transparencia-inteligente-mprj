@@ -81,6 +81,7 @@ O dashboard consulta a API em `MPRJ_API_URL` (padrão `http://127.0.0.1:8000`).
 | `python -m src.pipeline run [--entity id] [--workers N] [--no-probes]` | Coleta, avalia, pontua e grava uma nova execução |
 | `python -m src.pipeline reevaluate --latest` | Reaplica as regras atuais às últimas coletas, a partir dos snapshots (sem rede) |
 | `python -m src.scheduler --interval-hours 720` | Execução periódica residente. Para `schtasks` e `cron`, veja `src/scheduler.py` |
+| `python -m src.pipeline diagnostico --entity id` | Mostra o que o robô viu na última coleta: páginas, erros, links da capa por domínio, páginas que dependem de JavaScript |
 | `python -m src.validacao [--entity id] [--saida arquivo.xlsx]` | Planilha de validação manual robô × humano, com métricas calculadas (concordância, falsos "não atende", kappa) |
 | `python -m src.checklist` | Reimporta a planilha para `config/checklist.json` |
 | `python -m src.demo` | Base de demonstração sintética |

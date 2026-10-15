@@ -68,15 +68,39 @@ class Collection:
 
     @property
     def sufficient(self) -> bool:
-        """Coleta suficiente para afirmar AUSÊNCIA de algo (e não só presença)."""
+        """Coleta suficiente para afirmar AUSÊNCIA de algo (e não só presença).
+
+        Exige capa acessível, pelo menos 10 páginas válidas, coleta não abortada e, se há
+        portal (cadastrado ou descoberto), que ele tenha sido alcançado.
+        """
         h = self.health
-        return h["site_ok"] and h["paginas_ok"] >= 5 and not self.aborted
+        portal_reached = h["portal_ok"] is not False
+        return h["site_ok"] and h["paginas_ok"] >= 10 and not self.aborted and portal_reached
 
 
 def _key(url: str) -> str:
     url = urldefrag(url)[0]
     parts = urlsplit(url)
     return f"{parts.netloc.lower().removeprefix('www.')}{parts.path.rstrip('/')}?{parts.query}"
+
+
+_MULTI_SUFFIX = re.compile(r"\.(gov|leg|jus|mp|def|tc|com|org|net|edu)\.br$")
+_STATE_GOV = re.compile(r"\.[a-z]{2}\.(gov|leg|jus|mp|def)\.br$")
+
+
+def registrable_domain(url: str | None) -> str | None:
+    """Domínio institucional: japeri.rj.gov.br, prefeitura.rio, prefeituracachoeiras.com.
+
+    O crawler aceita qualquer subdomínio dele (site., portal., transparencia., esic.).
+    Sem isso, um cadastro como portal.duquedecaxias.rj.gov.br descartaria links para
+    duquedecaxias.rj.gov.br e transparencia.duquedecaxias.rj.gov.br.
+    """
+    host = _base_host(url)
+    if not host:
+        return None
+    labels = host.split(".")
+    keep = 4 if _STATE_GOV.search(host) else 3 if _MULTI_SUFFIX.search(host) else 2
+    return ".".join(labels[-keep:]) if len(labels) >= keep else host
 
 
 def _base_host(url: str | None) -> str | None:
@@ -105,7 +129,15 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
             abort_after: int = 5) -> Collection:
     site, portal = entity.get("site"), entity.get("portal")
     col = Collection(entity_id=entity["id"], site_url=site, portal_url=portal)
-    allowed = {h for h in (_base_host(site), _base_host(portal)) if h}
+    site_domain = registrable_domain(site)
+
+    def scope(url: str | None) -> str | None:
+        """Domínio da prefeitura inteiro; portal em domínio de fornecedor só pelo host exato
+        (evita entrar no portal de outro município hospedado pelo mesmo fornecedor)."""
+        dom = registrable_domain(url)
+        return dom if dom == site_domain or url == site else _base_host(url)
+
+    allowed = {h for h in (scope(site), scope(portal)) if h}
     counter = itertools.count()
     queue: list = []
     seen: set[str] = set()
@@ -160,7 +192,7 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
             portal, candidates = find_portal_link(home)
             if portal:
                 col.portal_url, col.portal_source = portal, "descoberto_na_capa"
-                allowed.add(_base_host(portal))
+                allowed.add(scope(portal))
     if col.portal_url and _key(col.portal_url) not in seen:
         visit(col.portal_url, 0)
 

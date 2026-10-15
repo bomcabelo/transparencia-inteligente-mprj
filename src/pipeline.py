@@ -118,6 +118,47 @@ def reevaluate(assessment_ids: list[int], db_path=None) -> list[int]:
     return created
 
 
+def diagnose(slug: str, db_path=None) -> None:
+    """Mostra o que o robô viu na última coleta da entidade (para investigar coletas fracas)."""
+    from src.collector import registrable_domain
+    with repo.connect(db_path) as db:
+        row = db.execute("""SELECT a.id FROM assessments a JOIN entities e ON e.id=a.entity_id
+                            WHERE e.slug=? AND a.kind='coleta' ORDER BY a.collected_at DESC, a.id DESC LIMIT 1""",
+                         (slug,)).fetchone()
+        if row is None:
+            print(f"Nenhuma coleta para '{slug}'.")
+            return
+        a = repo.assessment(db, row["id"], with_evidence=False)
+        col = repo.load_collection(db, row["id"])
+    h = a["saude_coleta"] or {}
+    print(f"Avaliação {a['id']} — coleta {a['collected_at']} — situação: {a['collection_status']}")
+    print(f"  site:   {a['site_url']}  (domínio aceito: {registrable_domain(a['site_url'])})")
+    print(f"  portal: {a['portal_url']}  [{a['portal_source']}]  (domínio aceito: {registrable_domain(a['portal_url'])})")
+    print(f"  páginas válidas: {h.get('paginas_ok')}  erros: {h.get('paginas_com_erro')}  "
+          f"dinâmicas (JS): {h.get('paginas_dinamicas')}  fornecedor: {', '.join(a['vendors'] or {}) or '—'}")
+    print(f"  temas encontrados: {', '.join(h.get('temas_cobertos') or []) or 'nenhum'}")
+    print(f"  score: {a['score']}  intervalo: [{a['score_min']}–{a['score_max']}]  cobertura: {a['cobertura_avaliacao']}")
+    print("\n  Páginas coletadas:")
+    for p in col.pages:
+        themes = ", ".join(list(p.themes)[:3]) if p.themes else ""
+        flag = " [JS?]" if p.status == 200 and p.looks_dynamic() else ""
+        print(f"   {p.status or '—':>4} d{p.depth} {len(p.links):>4} links  {p.final_url[:80]}  {themes}{flag}"
+              + (f"  ERRO={p.error}" if p.error else ""))
+    home = col.page("site")
+    if home and home.links:
+        hosts: dict[str, int] = {}
+        for link in home.links:
+            host = (link["url"].split("/")[2] if "://" in link["url"] else "")
+            hosts[host] = hosts.get(host, 0) + 1
+        print("\n  Links da capa por domínio (os de fora do domínio aceito não são seguidos):")
+        for host, n in sorted(hosts.items(), key=lambda kv: -kv[1])[:12]:
+            print(f"   {n:>4}  {host}")
+    if col.errors:
+        print("\n  Erros:")
+        for e in col.errors[:10]:
+            print(f"   {e.get('status')}  {e.get('error')}  {e.get('url')}")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Pipeline de avaliação de portais de transparência")
@@ -130,7 +171,12 @@ def main() -> None:
     rv = sub.add_parser("reevaluate", help="reprocessar coletas armazenadas com as regras atuais")
     rv.add_argument("--assessment", type=int, action="append")
     rv.add_argument("--latest", action="store_true", help="última coleta de cada entidade")
+    dg = sub.add_parser("diagnostico", help="mostrar o que o robô viu na última coleta de uma entidade")
+    dg.add_argument("--entity", required=True)
     args = parser.parse_args()
+    if args.cmd == "diagnostico":
+        diagnose(args.entity)
+        return
     if args.cmd == "run":
         run_id = run(args.entity, workers=args.workers, trigger=args.trigger, probes=not args.no_probes)
         print(f"Execução {run_id} concluída. API: uvicorn api.main:app | painel: streamlit run app/dashboard.py")

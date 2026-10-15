@@ -64,3 +64,37 @@ def test_not_applicable_for_other_entity_types():
 def test_unimplemented_criteria_are_marked_not_evaluated():
     results, _ = run(3)
     assert results["7.1"].status == "nao_avaliado"
+
+
+def test_registrable_domain_accepts_sibling_subdomains():
+    from src.collector import registrable_domain
+    assert registrable_domain("https://portal.duquedecaxias.rj.gov.br/") == "duquedecaxias.rj.gov.br"
+    assert registrable_domain("https://site.ib.itaborai.rj.gov.br/") == "itaborai.rj.gov.br"
+    assert registrable_domain("https://transparencia.prefeitura.rio/") == "prefeitura.rio"
+    assert registrable_domain("https://www.prefeituracachoeiras.com/") == "prefeituracachoeiras.com"
+    assert registrable_domain("https://japeri.geosiap.net.br/portal-transparencia") == "geosiap.net.br"
+
+
+def test_crawler_follows_links_to_sibling_subdomain():
+    home = '<html><title>Prefeitura</title><a href="https://duque.rj.gov.br/transparencia">Transparência</a></html>'
+    pages = {"https://portal.duque.rj.gov.br": home,
+             "https://duque.rj.gov.br/transparencia": "<html><title>Portal da Transparência</title></html>"}
+    entity = {"id": "d", "nome": "D", "tipo": "executivo_municipal", "site": "https://portal.duque.rj.gov.br",
+              "portal": None}
+    col = collect(entity, FixtureFetcher(pages))
+    assert col.portal_url == "https://duque.rj.gov.br/transparencia"
+    assert len(col.ok_pages) == 2
+
+
+def test_vendor_hosted_portal_does_not_open_other_municipalities():
+    portal = ('<html><title>Portal da Transparência</title><a href="https://outra.vendor.net.br/despesas">Despesas</a>'
+              '<a href="https://japeri.vendor.net.br/despesas">Despesas</a></html>')
+    pages = {"https://japeri.rj.gov.br": '<html><a href="https://japeri.vendor.net.br">Portal da Transparência</a></html>',
+             "https://japeri.vendor.net.br": portal,
+             "https://japeri.vendor.net.br/despesas": "<html><title>Despesas</title></html>",
+             "https://outra.vendor.net.br/despesas": "<html><title>Despesas de outra cidade</title></html>"}
+    entity = {"id": "j", "nome": "J", "tipo": "executivo_municipal", "site": "https://japeri.rj.gov.br", "portal": None}
+    f = FixtureFetcher(pages)
+    collect(entity, f)
+    assert "https://outra.vendor.net.br/despesas" not in f.calls
+    assert "https://japeri.vendor.net.br/despesas" in f.calls
