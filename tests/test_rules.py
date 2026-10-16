@@ -147,3 +147,21 @@ def test_sitemap_skips_news_posts_and_diversifies_themes():
     collect(entity, f)
     assert not any("aviso-de-licitacao" in c for c in f.calls)
     assert all(f"https://q.rj.gov.br/{p}" in f.calls for p in good)
+
+
+def test_absence_in_portal_content_requires_reaching_budget_pages():
+    """Caso Japeri: só o site institucional foi lido; não pode haver 'não atende' de receita/despesa/RGF."""
+    inst = "<html><title>Prefeitura - {t}</title><p>Telefone (21) 2670-0000. Secretaria de {t}.</p>{links}</html>"
+    names = ["saude", "educacao", "obras", "cultura", "esporte", "meio-ambiente", "turismo", "assistencia",
+             "governo", "comunicacao", "agricultura"]
+    links = "".join(f'<a href="https://m.rj.gov.br/secretaria-{n}">Secretaria institucional {n}</a>' for n in names)
+    pages = {"https://m.rj.gov.br": inst.format(t="Inicio", links=links)}
+    for n in names:
+        pages[f"https://m.rj.gov.br/secretaria-{n}"] = inst.format(t=n, links="")
+    entity = {"id": "m", "nome": "M", "tipo": "executivo_municipal", "site": "https://m.rj.gov.br", "portal": None}
+    col = collect(entity, FixtureFetcher(pages))
+    results = {r.criterion_id: r for r in evaluate(entity, col, today=TODAY)}
+    assert col.sufficient                                    # coleta "suficiente" para o site...
+    for cid in ("3.1", "4.1", "4.5", "12.1", "19.5", "20.1", "15.1"):
+        assert results[cid].status == "inconclusivo", cid    # ...mas não para afirmar ausência no portal
+    assert results["2.6"].status == "nao_atende"             # critério do site continua decidível

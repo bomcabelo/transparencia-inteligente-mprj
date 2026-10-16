@@ -24,7 +24,9 @@
     "geosiap": {
       "id_entidade": 10
     },
-    "ativo": true
+    "ativo": true,
+    "render_js": true,
+    "observacao": "Portal GeoSIAP montado por JavaScript: sem renderização o robô não alcança receita/despesa (validação manual de 16/10/2026)."
   },
   {
     "id": "itaborai",

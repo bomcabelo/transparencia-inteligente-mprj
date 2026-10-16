@@ -136,7 +136,8 @@ Por que não "mandar a página inteira para um LLM": seria caro (5.000 portais �
 
 1. **Coleta insuficiente** (capa inacessível, menos de 10 páginas válidas, coleta abortada ou portal identificado mas não alcançado) → `inconclusivo`, confiança 0,3.
 2. **Páginas relevantes dependem de JavaScript** (muito script e pouco texto) e não houve renderização → `inconclusivo`, com a recomendação de ativar `MPRJ_RENDER_JS=1`.
-3. Fora desses casos → `nao_atende`, com confiança moderada (0,55 a 0,7). As páginas examinadas ficam registradas como evidência de ausência.
+3. **Área de conteúdo do portal não alcançada.** Para critérios cujo conteúdo fica no portal (receita, despesa, gestão fiscal, instrumentos de planejamento, e-SIC, dados abertos), o robô só afirma ausência se tiver alcançado ao menos uma página de receita, despesa ou planejamento. Caso contrário → `inconclusivo`. Essa regra veio da validação manual: em Japeri, o portal GeoSIAP é montado por JavaScript, o robô leu 37 páginas só do site institucional e declarou "não atende" para receita, despesa, RGF e LOA, que existem (a API do portal retorna os dados). Eram falsos "não atende", o erro mais grave numa fiscalização.
+4. Fora desses casos → `nao_atende`, com confiança moderada (0,55 a 0,7). As páginas examinadas ficam registradas como evidência de ausência.
 
 ### 5.3 Evidências
 

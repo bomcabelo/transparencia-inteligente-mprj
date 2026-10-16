@@ -96,6 +96,28 @@ def page_ev(page: Page, snippet: str = "", kind: str = "pagina", **detail) -> Ev
     return Evidence(kind=kind, url=page.final_url, title=page.title, snippet=snippet or "", detail=detail)
 
 
+# Critérios cujo conteúdo fica no portal da transparência (execução orçamentária, gestão fiscal, e-SIC...).
+PORTAL_CONTENT = ("3.", "4.", "12.", "15.", "19.", "20.", "18.3")
+CORE_THEMES = {"despesa", "receita", "planejamento"}
+
+
+def portal_reached(ctx: Context) -> tuple[bool, str]:
+    """O robô chegou à área de conteúdo do portal? Sem isso, ausência não pode ser afirmada.
+
+    Regra criada na validação manual: em Japeri o portal (GeoSIAP) é montado por JavaScript e o
+    robô leu 37 páginas só do site institucional; ainda assim declarou "não atende" para receita,
+    despesa, RGF e LOA, que existem (a API do portal retorna os dados).
+    """
+    covered = set(ctx.collection.health["temas_cobertos"])
+    if covered & CORE_THEMES:
+        return True, ""
+    portal = ctx.collection.page("portal")
+    why = "nenhuma página de receita, despesa ou planejamento foi alcançada"
+    if portal is not None and portal.status == 200 and (portal.looks_dynamic() or len(portal.links) < 15):
+        why += f" (o portal {portal.host} tem {len(portal.links)} links no HTML: provável conteúdo dinâmico)"
+    return False, why
+
+
 def absence(ctx: Context, cid: str, what: str, *, relevant: list[Page] | None = None,
             confidence: float = 0.6) -> Result:
     """Decide entre `nao_atende` e `inconclusivo` quando nada foi encontrado."""
@@ -108,6 +130,12 @@ def absence(ctx: Context, cid: str, what: str, *, relevant: list[Page] | None = 
         return Result(cid, "inconclusivo", 0.3, f"Não encontrado: {what}. A coleta foi insuficiente "
                       f"({col.health['paginas_ok']} páginas válidas). Falha de acesso não é desconformidade.",
                       examined, needs_review=True)
+    if cid.startswith(PORTAL_CONTENT):
+        reached, why = portal_reached(ctx)
+        if not reached:
+            return Result(cid, "inconclusivo", 0.35, f"Não encontrado: {what}, mas {why}. Ausência no portal "
+                          "não pode ser afirmada sem alcançar a área de conteúdo (ativar render_js para a "
+                          "entidade ou cadastrar a URL da seção).", examined, needs_review=True)
     if dynamic and len(dynamic) >= max(1, len(scope) // 2):
         return Result(cid, "inconclusivo", 0.35, f"Não encontrado: {what}. As páginas relevantes dependem de "
                       "JavaScript não renderizado (ativar MPRJ_RENDER_JS=1).", examined, needs_review=True)
