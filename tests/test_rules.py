@@ -165,3 +165,22 @@ def test_absence_in_portal_content_requires_reaching_budget_pages():
     for cid in ("3.1", "4.1", "4.5", "12.1", "19.5", "20.1", "15.1"):
         assert results[cid].status == "inconclusivo", cid    # ...mas não para afirmar ausência no portal
     assert results["2.6"].status == "nao_atende"             # critério do site continua decidível
+
+
+def test_spa_hash_routes_are_followed_and_anchors_dropped():
+    """Caso GeoSIAP: menu com rotas '#/despesas'; âncoras '#topo' continuam sendo ignoradas."""
+    from src.page import clean_url
+    assert clean_url("https://p.net.br/portal/#/despesas") == "https://p.net.br/portal/#/despesas"
+    assert clean_url("https://p.net.br/portal/#!/receitas") == "https://p.net.br/portal/#!/receitas"
+    assert clean_url("https://p.net.br/portal/#topo") == "https://p.net.br/portal/"
+    portal = ('<html><title>Portal da Transparência</title><a href="#/despesas">Despesas</a>'
+              '<a href="#/receitas">Receitas</a><a href="#topo">Topo</a></html>')
+    pages = {"https://m.rj.gov.br": '<html><a href="https://m.vendor.net.br/portal">Portal da Transparência</a></html>',
+             "https://m.vendor.net.br/portal": portal,
+             "https://m.vendor.net.br/portal#/despesas": "<html><title>Despesas</title></html>",
+             "https://m.vendor.net.br/portal#/receitas": "<html><title>Receitas</title></html>"}
+    entity = {"id": "m", "nome": "M", "tipo": "executivo_municipal", "site": "https://m.rj.gov.br", "portal": None}
+    f = FixtureFetcher(pages)
+    col = collect(entity, f)
+    assert "https://m.vendor.net.br/portal#/despesas" in f.calls and "https://m.vendor.net.br/portal#/receitas" in f.calls
+    assert {"despesa", "receita"} <= set(col.health["temas_cobertos"])

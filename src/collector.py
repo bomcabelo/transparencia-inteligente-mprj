@@ -15,7 +15,7 @@ from urllib.parse import urldefrag, urlsplit
 
 from src.fetch import Fetcher, FetchResult, utc_now
 from src.fingerprint import VENDOR_URL, detect
-from src.page import DOC_EXT, Page, norm, parse_html
+from src.page import DOC_EXT, Page, norm, parse_html, route_fragment
 from src.themes import THEMES, classify_page, link_themes
 
 SKIP = re.compile(r"(noticia|galeria|evento|agenda|video|foto|login|logout|wp-admin|feed|rss|"
@@ -81,9 +81,10 @@ class Collection:
 
 
 def _key(url: str) -> str:
-    url = urldefrag(url)[0]
-    parts = urlsplit(url)
-    return f"{parts.netloc.lower().removeprefix('www.')}{parts.path.rstrip('/')}?{parts.query}"
+    route = route_fragment(url)
+    parts = urlsplit(urldefrag(url)[0])
+    key = f"{parts.netloc.lower().removeprefix('www.')}{parts.path.rstrip('/')}?{parts.query}"
+    return f"{key}#{route}" if route else key
 
 
 _MULTI_SUFFIX = re.compile(r"\.(gov|leg|jus|mp|def|tc|com|org|net|edu)\.br$")

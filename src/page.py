@@ -18,6 +18,22 @@ DOC_EXT = re.compile(r"\.(pdf|csv|xlsx?|ods|odt|docx?|json|xml|zip|txt|rtf)(?:$|
 MAX_TEXT = 300_000
 
 
+def route_fragment(url: str) -> str:
+    """Fragmento que é ROTA de aplicação SPA ("#/despesas", "#!/receitas"), ou "" se for âncora comum."""
+    frag = urldefrag(url)[1]
+    return frag if frag.startswith(("/", "!/")) else ""
+
+
+def clean_url(url: str) -> str:
+    """Remove âncoras de página ("#topo"), mas preserva rotas de SPA ("#/despesas").
+
+    Portais como o GeoSIAP usam roteamento por hash: sem isso, todos os links do menu
+    colapsam na mesma URL e o robô nunca chega às seções de receita e despesa.
+    """
+    base, frag = urldefrag(url)
+    return f"{base}#{frag}" if frag.startswith(("/", "!/")) else base
+
+
 def norm(value: str) -> str:
     """Minúsculas e sem acentos, para comparar termos com grafias diferentes."""
     raw = unicodedata.normalize("NFKD", str(value or ""))
@@ -127,7 +143,7 @@ def parse_html(*, url: str, final_url: str | None, status: int | None, fetched_a
             page.breadcrumb = re.sub(r"\s+", " ", m.group(0))[:200]
 
     for tag in soup.select("a[href]")[:3000]:
-        href = urldefrag(urljoin(base, tag.get("href", "").strip()))[0]
+        href = clean_url(urljoin(base, tag.get("href", "").strip()))
         if not href.startswith(("http://", "https://")):
             continue
         label = _text(tag)[:200] or (tag.get("title") or tag.get("aria-label") or "")[:200]

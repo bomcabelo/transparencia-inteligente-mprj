@@ -246,7 +246,10 @@ class PlaywrightFetcher:
             self._browser = self._pw.chromium.launch()
 
     def needs_render(self, result: FetchResult) -> bool:
-        return self._first or result.body.lower().count(b"<a ") < self.MIN_ANCHORS
+        from src.page import route_fragment
+        # Rota de SPA ("#/despesas"): o HTML estático é sempre a mesma casca; só renderizando se vê a seção.
+        return self._first or bool(route_fragment(result.url)) or \
+            result.body.lower().count(b"<a ") < self.MIN_ANCHORS
 
     def fetch(self, url: str) -> FetchResult:
         result = self.base.fetch(url)  # política (robots, URL pública) e conteúdo estático
@@ -260,7 +263,11 @@ class PlaywrightFetcher:
             result.renderer = f"http(render_indisponivel:{type(exc).__name__})"
             return result
         try:
-            page.goto(result.final_url or url, wait_until="load", timeout=45_000)
+            from src.page import route_fragment
+            route = route_fragment(url)
+            target = f"{(result.final_url or url).split('#')[0]}#{route}" if route else (result.final_url or url)
+            result.final_url = target  # preserva a rota da SPA como identidade da página
+            page.goto(target, wait_until="load", timeout=45_000)
             try:
                 page.wait_for_load_state("networkidle", timeout=10_000)
             except Exception:
