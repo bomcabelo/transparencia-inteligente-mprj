@@ -37,6 +37,8 @@ class Collection:
     aborted: str | None = None
     vendors: dict = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)  # decisões da coleta (fallbacks, avisos)
+    budget_exhausted: bool = False                  # parou por limite de páginas, não por falta de links
+    pending_themes: dict = field(default_factory=dict)  # temas de links que ficaram na fila sem visita
 
     def page(self, role: str) -> Page | None:
         target = self.site_url if role == "site" else self.portal_url
@@ -66,6 +68,8 @@ class Collection:
             "temas_nao_encontrados": sorted(set(THEMES) - set(covered)),
             "abortada": self.aborted,
             "notas": self.notes,
+            "orcamento_esgotado": self.budget_exhausted,
+            "temas_pendentes": self.pending_themes,
         }
 
     @property
@@ -202,9 +206,9 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
         host = _base_host(url) or ""
         return any(host == h or host.endswith("." + h) for h in allowed)
 
-    def push(url: str, depth: int, priority: float) -> None:
+    def push(url: str, depth: int, priority: float, themes: tuple = ()) -> None:
         if _key(url) not in seen:
-            heapq.heappush(queue, (-priority, next(counter), url, depth))
+            heapq.heappush(queue, (-priority, next(counter), url, depth, themes))
 
     def visit(url: str, depth: int) -> Page | None:
         nonlocal consecutive_failures
@@ -240,7 +244,7 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
                 if not themes:
                     continue
                 priority = sum(s * (2 if t not in covered else 1) for t, s in themes.items()) - depth
-                push(href, depth + 1, priority)
+                push(href, depth + 1, priority, tuple(themes))
         return page
 
     if site:
@@ -258,7 +262,7 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
             if consecutive_failures >= abort_after:
                 col.aborted = f"{consecutive_failures} falhas consecutivas: coleta interrompida (circuit breaker)"
                 break
-            _, _, url, depth = heapq.heappop(queue)
+            _, _, url, depth, _themes = heapq.heappop(queue)
             if _key(url) in seen:
                 continue
             visit(url, depth)
@@ -304,12 +308,21 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
             if per_theme.get(theme, 0) < 3:  # no máximo 3 URLs por tema: cobre mais temas
                 per_theme[theme] = per_theme.get(theme, 0) + 1
                 picked.append(u)
-                push(u, 1, priority)
+                push(u, 1, priority, (theme,))
         col.notes.append(f"Sitemap consultado: {len(found)} URLs no domínio; {posts} descartadas por parecerem "
                          f"notícias; {len(picked)} selecionadas ({', '.join(sorted(per_theme))}).")
         crawl()
         adopt_portal("descoberto_via_sitemap")
 
+    # Orçamento esgotado com links temáticos ainda na fila: ausência desses temas não é conclusiva.
+    col.budget_exhausted = len(col.pages) >= max_pages
+    for *_, url, _depth, themes in queue:
+        if _key(url) not in seen:
+            for t in themes:
+                col.pending_themes[t] = col.pending_themes.get(t, 0) + 1
+    if col.budget_exhausted and col.pending_themes:
+        top = ", ".join(f"{t} ({n})" for t, n in sorted(col.pending_themes.items(), key=lambda kv: -kv[1])[:6])
+        col.notes.append(f"Limite de {max_pages} páginas atingido com links ainda na fila: {top}.")
     col.vendors = detect(col.ok_pages)
     col.finished_at = utc_now()
     return col

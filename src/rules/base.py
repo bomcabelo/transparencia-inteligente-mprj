@@ -101,6 +101,21 @@ PORTAL_CONTENT = ("3.", "4.", "12.", "15.", "19.", "20.", "18.3")
 CORE_THEMES = {"despesa", "receita", "planejamento"}
 
 
+# Tema(s) onde cada critério procura evidência; usado para saber se a busca foi esgotada.
+CRITERION_THEMES = {"3.": ("receita",), "4.": ("despesa",), "12.": ("planejamento",), "19.": ("planejamento",),
+                    "20.": ("planejamento",), "15.": ("sic",), "18.1": ("lgpd",), "18.3": ("dados_abertos",),
+                    "2.1": ("institucional",), "2.9": ("ouvidoria",)}
+
+
+def unexplored(ctx: Context, cid: str) -> list[str]:
+    """Temas do critério que ficaram com links na fila quando o limite de páginas acabou."""
+    col = ctx.collection
+    if not col.budget_exhausted:
+        return []
+    themes = next((v for k, v in CRITERION_THEMES.items() if cid == k or (k.endswith(".") and cid.startswith(k))), ())
+    return [t for t in themes if col.pending_themes.get(t)]
+
+
 def portal_reached(ctx: Context) -> tuple[bool, str]:
     """O robô chegou à área de conteúdo do portal? Sem isso, ausência não pode ser afirmada.
 
@@ -136,6 +151,12 @@ def absence(ctx: Context, cid: str, what: str, *, relevant: list[Page] | None = 
             return Result(cid, "inconclusivo", 0.35, f"Não encontrado: {what}, mas {why}. Ausência no portal "
                           "não pode ser afirmada sem alcançar a área de conteúdo (ativar render_js para a "
                           "entidade ou cadastrar a URL da seção).", examined, needs_review=True)
+    pending = unexplored(ctx, cid)
+    if pending:
+        n = sum(col.pending_themes[t] for t in pending)
+        return Result(cid, "inconclusivo", 0.4, f"Não encontrado: {what}, mas o limite de páginas acabou com {n} "
+                      f"link(s) de {', '.join(pending)} ainda não visitados. Ausência não pode ser afirmada "
+                      "(aumentar max_paginas para a entidade).", examined, needs_review=True)
     if dynamic and len(dynamic) >= max(1, len(scope) // 2):
         return Result(cid, "inconclusivo", 0.35, f"Não encontrado: {what}. As páginas relevantes dependem de "
                       "JavaScript não renderizado (ativar MPRJ_RENDER_JS=1).", examined, needs_review=True)

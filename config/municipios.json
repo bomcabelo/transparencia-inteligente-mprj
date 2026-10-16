@@ -26,7 +26,8 @@
     },
     "ativo": true,
     "render_js": true,
-    "observacao": "Portal GeoSIAP montado por JavaScript: sem renderização o robô não alcança receita/despesa (validação manual de 16/10/2026)."
+    "observacao": "Portal GeoSIAP montado por JavaScript: sem renderização o robô não alcança receita/despesa (validação manual de 16/10/2026). Portal com muitas rotas: limite de 80 páginas.",
+    "max_paginas": 80
   },
   {
     "id": "itaborai",

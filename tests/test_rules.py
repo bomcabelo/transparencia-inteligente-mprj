@@ -184,3 +184,19 @@ def test_spa_hash_routes_are_followed_and_anchors_dropped():
     col = collect(entity, f)
     assert "https://m.vendor.net.br/portal#/despesas" in f.calls and "https://m.vendor.net.br/portal#/receitas" in f.calls
     assert {"despesa", "receita"} <= set(col.health["temas_cobertos"])
+
+
+def test_absence_is_inconclusive_when_budget_ends_with_theme_links_pending():
+    """Caso Japeri (3ª execução): limite de páginas atingido antes de visitar a seção de gestão fiscal."""
+    links = "".join(f'<a href="https://m.rj.gov.br/despesas/{i}">Despesas {i}</a>' for i in range(12))
+    pages = {"https://m.rj.gov.br": f"<html><title>Portal da Transparência - Despesas</title>{links}</html>"}
+    for i in range(12):
+        extra = '<a href="https://m.rj.gov.br/gestao-fiscal">Gestão Fiscal RGF RREO</a>' if i == 9 else ""
+        pages[f"https://m.rj.gov.br/despesas/{i}"] = f"<html><title>Despesas {i}</title>{extra}</html>"
+    pages["https://m.rj.gov.br/gestao-fiscal"] = "<html><title>Gestão Fiscal</title></html>"
+    entity = {"id": "m", "nome": "M", "tipo": "executivo_municipal", "site": "https://m.rj.gov.br", "portal": None}
+    col = collect(entity, FixtureFetcher(pages), max_pages=11)   # capa + 10 páginas: RGF descoberto no fim
+    assert col.budget_exhausted and col.pending_themes.get("planejamento")
+    results = {r.criterion_id: r for r in evaluate(entity, col, today=TODAY)}
+    assert results["12.1"].status == "parcial"                # link para RGF visto, arquivo não alcançado
+    assert results["19.5"].status == "inconclusivo" and "limite de páginas" in results["19.5"].finding
