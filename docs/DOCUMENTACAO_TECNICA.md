@@ -175,6 +175,8 @@ A planilha traz só os critérios aplicáveis e automatizados, com o status, a c
 | Quebra por critério e por entidade | Indica qual regra ajustar primeiro |
 | Matriz de confusão robô × humano | Mostra o padrão dos erros |
 
+Depois de um ajuste, `python -m src.validacao --anterior data\validacao.xlsx --saida data\validacao_depois.xlsx` gera a nova planilha **reaproveitando as respostas humanas** (o portal não mudou, só o robô). As linhas em que o robô mudou de status ficam destacadas, e as métricas do "depois" saem sem refazer a conferência.
+
 O ciclo é: conferir → ajustar a regra (registrando na aba **Ajustes**) → `python -m src.pipeline reevaluate --latest` (sem acessar os portais) → exportar de novo e comparar. Os resultados dessa validação devem ser reportados junto com o score, e calibram os valores de confiança (§5.4).
 
 ### 5.6 Data de referência

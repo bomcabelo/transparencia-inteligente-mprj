@@ -285,7 +285,51 @@ def _ajustes(wb: Workbook) -> None:
             ws.cell(row=r, column=c).border = BOX
 
 
-def export(output: Path, slugs: list[str] | None = None, db_path=None) -> int:
+def _carry_over(wb: Workbook, previous: Path) -> dict:
+    """Reaproveita a conferência humana de uma planilha anterior (mesma entidade + critério).
+
+    O que o avaliador verificou no portal continua válido quando só o ROBÔ mudou (nova regra,
+    reprocessamento). Linhas em que o status do robô mudou são destacadas para conferência rápida;
+    as métricas do "depois" passam a ser calculadas sem refazer a validação.
+    """
+    from openpyxl import load_workbook
+
+    old = load_workbook(previous)
+    src = old["Avaliação"]
+    idx = {name: i for i, (name, _, _) in enumerate(COLS)}
+    answers = {}
+    for row in src.iter_rows(min_row=2, values_only=True):
+        if row and row[idx["Entidade"]]:
+            answers[(row[idx["Entidade"]], str(row[idx["Critério"]]))] = row
+    ws = wb["Avaliação"]
+    changed_fill = PatternFill("solid", fgColor="BDD7EE")
+    stats = {"reaproveitadas": 0, "status_robo_mudou": 0, "sem_correspondencia": 0}
+    for r in range(2, ws.max_row + 1):
+        key = (ws.cell(r, idx["Entidade"] + 1).value, str(ws.cell(r, idx["Critério"] + 1).value))
+        prev = answers.get(key)
+        if prev is None:
+            stats["sem_correspondencia"] += 1
+            continue
+        if prev[idx["Status conferido"]]:
+            stats["reaproveitadas"] += 1
+        for col in ("Status conferido", "URL onde conferiu", "Causa da divergência", "Observação"):
+            if prev[idx[col]] not in (None, ""):
+                ws.cell(r, idx[col] + 1).value = prev[idx[col]]
+        before, now = prev[idx["Status do robô"]], ws.cell(r, idx["Status do robô"] + 1).value
+        if before != now:
+            stats["status_robo_mudou"] += 1
+            ws.cell(r, idx["Status do robô"] + 1).fill = changed_fill
+            ws.cell(r, idx["Status do robô"] + 1).comment = Comment(f"Antes: {before}. Confira esta linha.", "validacao")
+    if "Ajustes" in old.sheetnames:  # mantém o histórico de ajustes
+        dst = wb["Ajustes"]
+        for r, row in enumerate(old["Ajustes"].iter_rows(min_row=2, values_only=True), 2):
+            for c, v in enumerate(row, 1):
+                if v not in (None, ""):
+                    dst.cell(r, c).value = v
+    return stats
+
+
+def export(output: Path, slugs: list[str] | None = None, db_path=None, previous: Path | None = None) -> int:
     with repo.connect(db_path) as db:
         rows = _rows(db, slugs)
     rows.sort(key=lambda r: (r[0], tuple(int(p) for p in r[3].split("."))))
@@ -301,6 +345,11 @@ def export(output: Path, slugs: list[str] | None = None, db_path=None) -> int:
     _metricas(wb, last, entidades, criterios)
     _ajustes(wb)
     wb.move_sheet("Métricas", offset=-2)
+    if previous:
+        stats = _carry_over(wb, previous)
+        print(f"Conferência anterior: {stats['reaproveitadas']} respostas reaproveitadas; "
+              f"{stats['status_robo_mudou']} linhas com status do robô alterado (em azul, para conferir); "
+              f"{stats['sem_correspondencia']} linhas novas.")
     output.parent.mkdir(parents=True, exist_ok=True)
     wb.save(output)
     return len(rows)
@@ -310,8 +359,11 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Gera planilha de validação manual robô × humano")
     p.add_argument("--entity", action="append", help="slug da entidade (repetível); padrão: todas")
     p.add_argument("--saida", type=Path, default=Path(f"data/validacao_{date.today():%Y%m%d}.xlsx"))
+    p.add_argument("--anterior", type=Path, help="planilha já conferida: reaproveita as respostas humanas")
     a = p.parse_args()
-    n = export(a.saida, a.entity)
+    if a.anterior and a.anterior.resolve() == a.saida.resolve():
+        p.error("--saida deve ser diferente de --anterior (para não apagar a conferência)")
+    n = export(a.saida, a.entity, previous=a.anterior)
     print(f"{n} linhas exportadas para {a.saida}")
 
 
