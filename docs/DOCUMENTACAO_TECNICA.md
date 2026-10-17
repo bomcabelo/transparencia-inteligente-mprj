@@ -115,7 +115,7 @@ Por que não "mandar a página inteira para um LLM": seria caro (5.000 portais �
 | FastAPI | API | OpenAPI/Swagger automático, tipagem, testes com TestClient |
 | Streamlit + Altair | Dashboard | Painel analítico rápido de construir que consome a API |
 | openpyxl | Importação do checklist | Planilha original versionada como fonte de verdade |
-| pytest | Testes | 66 testes, incluindo pipeline ponta a ponta offline |
+| pytest | Testes | 85 testes, incluindo pipeline ponta a ponta offline |
 
 ## 5. Metodologia de avaliação
 
