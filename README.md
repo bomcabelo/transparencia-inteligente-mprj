@@ -135,7 +135,7 @@ src/
   validacao.py  planilha de validação robô × avaliador humano
   demo.py       portal sintético para testes e demonstração
   crawler.py, discovery.py, evidence.py, evaluator.py, database.py, geosiap_*   etapas exploratórias anteriores
-tests/          85 testes (regras, score, IA, fetch, pipeline ponta a ponta, API)
+tests/          88 testes (regras, score, IA, fetch, pipeline ponta a ponta, API)
 docs/           documentação técnica, critérios, histórico das etapas
 ```
 

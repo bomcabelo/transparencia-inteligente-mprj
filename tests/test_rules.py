@@ -255,3 +255,32 @@ def test_validation_fix_additional_official_domain_is_followed():
               "dominios_adicionais": ["rio.rj.gov.br"]}
     collect(entity, f)
     assert "https://www.rio.rj.gov.br/web/contasrio/despesas" in f.calls
+
+
+def test_validation_fix_breadcrumb_separator_in_own_element():
+    """Japeri (2ª rodada): o separador '»' fica num elemento próprio; a trilha está no avô."""
+    from src.page import parse_html
+    html = ("<html><body><ol><li><a href='/p'>Painel COVID-19</a></li><li><span>»</span></li>"
+            "<li>Despesas Realizadas</li></ol></body></html>").encode()
+    page = parse_html(url="https://v/x", final_url=None, status=200, fetched_at="", body=html)
+    assert "Painel COVID-19" in page.breadcrumb and "Despesas Realizadas" in page.breadcrumb
+
+
+def test_validation_fix_breadcrumb_measured_on_portal_pages():
+    """Japeri (2ª rodada): páginas do site institucional, sem trilha, não diluem as do portal."""
+    crumb = '<div class="breadcrumb">Início › {t}</div>'
+    portal_pages = {f"https://v.vendor.net.br/{n}": f"<html><title>{n}</title>{crumb.format(t=n)}</html>"
+                    for n in ("despesas", "receitas")}
+    links = "".join(f'<a href="{u}">{u.rsplit("/", 1)[1].title()}</a>' for u in portal_pages)
+    pages = _base_site({"https://v.vendor.net.br": f"<html><title>Portal da Transparência</title>{links}</html>",
+                        **portal_pages})
+    results, col = _eval(pages, portal="https://v.vendor.net.br")
+    assert results["16.1"].status == "atende", results["16.1"].finding
+
+
+def test_validation_fix_export_in_unvisited_external_system_is_inconclusive():
+    """Rio (2ª rodada): a página de despesas aponta o sistema de consulta, que não foi visitado."""
+    page = ('<html><title>Despesas</title>'
+            '<a href="https://contas.outro.gov.br/execucao">Consulta da execução da despesa</a></html>')
+    results, _ = _eval(_base_site({"https://v.rj.gov.br/despesas": page}))
+    assert results["4.5"].status == "inconclusivo" and "sistema externo" in results["4.5"].finding

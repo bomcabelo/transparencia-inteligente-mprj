@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from urllib.parse import urlparse
 
+from src.collector import _key
 from src.page import Page, norm
 from src.rules.base import Context, Evidence, Result, absence, page_ev, rule
 
@@ -116,6 +118,14 @@ def r_1_3(ctx: Context) -> Result:
 def r_16_1(ctx: Context) -> Result:
     """Trilha de navegação (breadcrumb) nas páginas internas."""
     internal = [p for p in ctx.pages if p.depth >= 1]
+    # O critério é do portal: se ele tem páginas internas próprias, mede-se nelas (validação de
+    # 17/10/2026: em Japeri as páginas do site institucional, sem trilha, diluíam as do portal).
+    portal = ctx.collection.portal_url
+    if portal:
+        host = urlparse(portal).netloc
+        own = [p for p in internal if urlparse(p.final_url or p.url).netloc == host]
+        if own:
+            internal = own
     with_crumb = [p for p in internal if p.breadcrumb]
     if not internal:
         return Result("16.1", "inconclusivo", 0.3, "Nenhuma página interna coletada.", needs_review=True)
@@ -270,6 +280,19 @@ def _formats(ctx: Context, cid: str, theme: str, label: str) -> Result:
                       + ("" if MACHINE & set(exts) else " (nenhum formato legível por máquina)") + ".", ev)
     if not pages:
         return absence(ctx, cid, f"Página de {label}")
+    # Sistema de consulta apontado pelas páginas do tema e não visitado (ex.: Contas Rio, validação
+    # de 17/10/2026): a exportação pode estar lá, então ausência não pode ser afirmada.
+    visited = {_key(p.url) for p in ctx.pages} | {_key(p.final_url) for p in ctx.pages if p.final_url}
+    outward = [(p, l) for p in pages for l in p.links
+               if _key(l["url"]) not in visited and urlparse(l["url"]).netloc
+               and urlparse(l["url"]).netloc != urlparse(p.final_url or p.url).netloc
+               and re.search(rf"{theme}|execucao|consulta|download|dados abertos|contas", norm(l["text"] + " " + l["url"]))]
+    if outward:
+        p, l = outward[0]
+        return Result(cid, "inconclusivo", 0.4, f"Exportação de relatórios de {label} não encontrada nas páginas "
+                      f"visitadas, mas elas apontam para {len(outward)} link(s) de sistema externo não visitado(s) "
+                      f"(ex.: {urlparse(l['url']).netloc}).", [Evidence("link", l["url"], p.title, l["text"])],
+                      needs_review=True)
     return absence(ctx, cid, f"Exportação de relatórios de {label}", relevant=pages, confidence=0.6)
 
 

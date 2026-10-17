@@ -115,7 +115,7 @@ Por que não "mandar a página inteira para um LLM": seria caro (5.000 portais �
 | FastAPI | API | OpenAPI/Swagger automático, tipagem, testes com TestClient |
 | Streamlit + Altair | Dashboard | Painel analítico rápido de construir que consome a API |
 | openpyxl | Importação do checklist | Planilha original versionada como fonte de verdade |
-| pytest | Testes | 85 testes, incluindo pipeline ponta a ponta offline |
+| pytest | Testes | 88 testes, incluindo pipeline ponta a ponta offline |
 
 ## 5. Metodologia de avaliação
 
@@ -219,6 +219,29 @@ Por município: Rio de Janeiro com 17 acertos em 21 pares e 2 falsos "não atend
 | Rio: formatos de despesa (4.5) | Exportação em CSV/TXT no Contas Rio (`rio.rj.gov.br`), outro domínio oficial | Cadastro aceita `dominios_adicionais` por entidade; Rio inclui `rio.rj.gov.br` |
 
 Cada ajuste tem um teste automatizado que reproduz o caso real. Os quatro primeiros valem no reprocessamento das coletas guardadas, sem acessar os portais (`python -m src.pipeline reevaluate --latest`). O do Rio exige nova coleta. As métricas depois dos ajustes são medidas com a mesma conferência humana (`python -m src.validacao --anterior`), sem refazer a validação.
+
+**Depois dos ajustes (17/10/2026).** Nova coleta de Rio e Japeri, conferida com as mesmas respostas humanas (`docs/validacao/validacao_2026-10-17_depois.xlsx`):
+
+| Métrica | Antes | Depois |
+|---|---|---|
+| Pares conclusivos | 42 | 41 |
+| Concordância exata | 76,2% (32/42) | **90,2%** (37/41) |
+| Kappa de Cohen | 0,55 (moderada) | **0,80** (substancial) |
+| Precisão do "atende" | 100% (24/24) | 100% (24/24) |
+| Falsos "não atende" | 8 | **2** |
+| Inconclusivos do robô | 11 (20,4%) | 12 (22,2%) |
+| Japeri / Rio (acertos/pares) | 15/21 · 17/21 | 20/21 · 17/20 |
+
+Seis resultados mudaram: os cinco documentos de Japeri (PPA, LDO, LOA, RREO, RGF) passaram de "não atende" para "parcial", como o avaliador, e a atualização da despesa no Rio (4.6) passou de "não atende" para "inconclusivo". Os inconclusivos subiram de 11 para 12. É o custo esperado: o robô troca uma afirmação errada por uma dúvida declarada.
+
+Dois ajustes não surtiram efeito na coleta real, e a segunda rodada de correções trata cada um:
+
+| Falso "não atende" restante | Por que o primeiro ajuste não bastou | Segunda correção |
+|---|---|---|
+| Japeri: trilha (16.1) | A trilha do portal foi diluída pelas páginas do site institucional, sem trilha, no cálculo da proporção; o separador `»` também pode estar num elemento próprio | Proporção medida nas páginas do portal quando ele tem páginas internas; a busca do separador sobe até 3 níveis na árvore |
+| Rio: formatos de despesa (4.5) | Com 40 páginas a coleta esgotou antes de chegar ao Contas Rio | Limite do Rio elevado para 80 páginas; se as páginas de despesa apontam sistema externo não visitado, o resultado é `inconclusivo` |
+
+As duas correções têm testes que reproduzem os casos. A conferência desta segunda rodada exige nova coleta e não está incluída nos números acima.
 
 **Limitações da validação.** É uma amostra pequena (2 municípios, 54 critérios), conferida por um único avaliador, e os ajustes foram feitos sobre a mesma amostra. As métricas depois dos ajustes, portanto, superestimam o desempenho em municípios novos. O próximo passo é validar Duque de Caxias, Itaboraí e Cachoeiras de Macacu sem novos ajustes, como amostra de teste, e com um segundo avaliador em parte das linhas, para medir a concordância entre humanos.
 
@@ -429,7 +452,7 @@ Status sempre com ícone e rótulo, nunca só cor. Tema escuro em `.streamlit/co
 - **Visibilidade na capa (1.2).** Sem renderização, verifica-se a existência do link, não o destaque visual.
 - **Pesos e limites** (pesos 3/2/1, 7/45 dias, faixas) são propostas defensáveis, mas precisam de validação com especialistas do GATE/MPRJ. Estão em configuração justamente por isso.
 - **Confiança heurística**, ainda não calibrada contra avaliação humana (§5.4).
-- **Validação real.** A primeira validação manual (Rio e Japeri, 54 critérios) mostrou 100% de precisão no "atende" e 0% no "não atende" (8 falsos), com kappa de 0,55 (§5.5.1). As causas foram corrigidas, mas a amostra é pequena e serviu também para os ajustes, então é preciso validar outros municípios como amostra de teste.
+- **Validação real.** A primeira validação manual (Rio e Japeri, 54 critérios) mostrou 100% de precisão no "atende" e 0% no "não atende" (8 falsos), com kappa de 0,55. Depois dos ajustes, a concordância subiu de 76,2% para 90,2%, o kappa para 0,80 e os falsos "não atende" caíram para 2 (§5.5.1). Mas a amostra é pequena e serviu também para os ajustes, então é preciso validar outros municípios como amostra de teste.
 - **Bloqueio por firewall.** Em 15/10/2026, o firewall do site de Itaboraí (Wordfence) bloqueou o IP do avaliador depois de execuções seguidas: capa, sitemap e cerca de 40 páginas em menos de uma hora, com intervalo de 1 s. A versão então vigente insistia 3 vezes em respostas 503. Correções: parar ao primeiro sinal de limite, intervalo e número máximo de páginas configuráveis por entidade (Itaboraí: 5 s e 25 páginas) e nunca contornar o bloqueio. Em produção, o mesmo vale com mais força: token bucket por domínio, janelas noturnas e IP institucional identificado, com contato publicado.
 - **Assinaturas de fornecedor** são padrões textuais e podem gerar falso positivo. A primeira versão marcava "Agili" em qualquer texto com "agilidade"; hoje as assinaturas exigem palavra inteira ou domínio.
 - **Domínios oficiais** de Niterói e Maricá estão cadastrados como inativos até confirmação.

@@ -68,7 +68,8 @@
     "dominios_adicionais": [
       "rio.rj.gov.br"
     ],
-    "observacao": "Execução orçamentária e dados abertos no Contas Rio (rio.rj.gov.br), apontado pelo portal (validação manual de 17/10/2026)."
+    "max_paginas": 80,
+    "observacao": "Execução orçamentária e dados abertos no Contas Rio (rio.rj.gov.br), apontado pelo portal (validação manual de 17/10/2026). Com 40 páginas a coleta esgotava antes de chegar ao Contas Rio: limite de 80."
   },
   {
     "id": "niteroi",

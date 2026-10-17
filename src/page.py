@@ -142,11 +142,22 @@ def parse_html(*, url: str, final_url: str | None, status: int | None, fetched_a
         if m:
             page.breadcrumb = re.sub(r"\s+", " ", m.group(0))[:200]
         else:  # trilha sem classe CSS, só com separadores: "Painel COVID-19 » Despesas Realizadas"
+            # O separador pode estar num elemento próprio (<span>»</span>): sobe até 3 níveis.
             for node in soup.find_all(string=re.compile(r"[»›]")):
-                text = _text(node.parent)
-                parts = [x for x in re.split(r"\s*[»›]\s*", text) if x.strip()]
-                if 5 < len(text) < 200 and len(parts) >= 2:
-                    page.breadcrumb = text
+                el, found = node.parent, None
+                for _ in range(3):
+                    if el is None:
+                        break
+                    text = _text(el)
+                    parts = [x for x in re.split(r"\s*[»›]\s*", text) if x.strip()]
+                    if len(text) >= 200:
+                        break
+                    if len(parts) >= 2 and len(text) > 5:
+                        found = text
+                        break
+                    el = el.parent
+                if found:
+                    page.breadcrumb = found
                     break
 
     for tag in soup.select("a[href]")[:3000]:
