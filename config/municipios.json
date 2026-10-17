@@ -64,7 +64,11 @@
     "uf": "RJ",
     "site": "https://prefeitura.rio/",
     "portal": "https://transparencia.prefeitura.rio/",
-    "ativo": true
+    "ativo": true,
+    "dominios_adicionais": [
+      "rio.rj.gov.br"
+    ],
+    "observacao": "Execução orçamentária e dados abertos no Contas Rio (rio.rj.gov.br), apontado pelo portal (validação manual de 17/10/2026)."
   },
   {
     "id": "niteroi",

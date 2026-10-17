@@ -141,6 +141,13 @@ def parse_html(*, url: str, final_url: str | None, status: int | None, fetched_a
         m = re.search(r"voc[eê] est[aá] (aqui|em)\s*:?\s*(.{0,160})", soup.get_text(" "), re.I)
         if m:
             page.breadcrumb = re.sub(r"\s+", " ", m.group(0))[:200]
+        else:  # trilha sem classe CSS, só com separadores: "Painel COVID-19 » Despesas Realizadas"
+            for node in soup.find_all(string=re.compile(r"[»›]")):
+                text = _text(node.parent)
+                parts = [x for x in re.split(r"\s*[»›]\s*", text) if x.strip()]
+                if 5 < len(text) < 200 and len(parts) >= 2:
+                    page.breadcrumb = text
+                    break
 
     for tag in soup.select("a[href]")[:3000]:
         href = clean_url(urljoin(base, tag.get("href", "").strip()))

@@ -14,6 +14,7 @@ Desafio técnico GATE/MPRJ — Cientista de Dados. Autor: Anderson da Silva Rodr
 | Documento | Conteúdo |
 |---|---|
 | [docs/DOCUMENTACAO_TECNICA.md](docs/DOCUMENTACAO_TECNICA.md) | Problema, arquitetura, abordagem, metodologia de avaliação e de pontuação, não aplicáveis, erros, atualização, escalabilidade, IA, limitações e evolução |
+| [docs/DOCUMENTACAO_TECNICA.md §5.5.1](docs/DOCUMENTACAO_TECNICA.md#551-resultados-da-validação-17102026) | Resultados da validação manual (robô × humano) e ajustes feitos |
 | [docs/CRITERIOS.md](docs/CRITERIOS.md) | Os 27 critérios automatizados, a justificativa da seleção e como adicionar novos |
 
 ## Destaques

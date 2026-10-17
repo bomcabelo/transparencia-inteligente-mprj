@@ -320,6 +320,15 @@ def _document(ctx: Context, cid: str, pattern: str, what: str, theme: str = "pla
         return Result(cid, "parcial", 0.55, f"Link para {what} encontrado, mas o arquivo não foi alcançado "
                       "(pode estar em consulta dinâmica ou página não coletada).",
                       [Evidence("link", l["url"], p.title, l["text"]) for p, l in links[:3]], needs_review=True)
+    # Item de menu sem <a href> (portais SPA usam botões/cliques): menção no portal é indício, não ausência.
+    # Ajuste da validação manual: em Japeri o menu oferece PPA/LDO/LOA/RREO/RGF e o robô dizia "não atende".
+    mentions = [(p, sn) for p in ctx.pages if p.themes.get("transparencia") or p.themes.get(theme)
+                for sn in [p.snippet(pattern, 80)] if sn]
+    if mentions:
+        p, sn = mentions[0]
+        return Result(cid, "parcial", 0.5, f"{what} citado no portal (item de menu ou texto), sem link navegável "
+                      "nem arquivo alcançado: provável consulta dinâmica.", [page_ev(p, sn, kind="texto")],
+                      needs_review=True)
     return absence(ctx, cid, what, relevant=ctx.themed(theme) or None, confidence=0.6)
 
 
@@ -379,6 +388,9 @@ def r_4_6(ctx: Context) -> Result:
                       "(datas podem estar em consulta dinâmica).", [page_ev(p) for p in pages[:3]], needs_review=True)
     page, latest = max(dated, key=lambda x: x[1])
     age = (ctx.today - latest).days
+    in_table = any(latest.strftime("%d/%m/%Y") in " ".join(c for row in t["sample"] for c in row)
+                   or latest.strftime("%d/%m/%Y").lstrip("0") in " ".join(c for row in t["sample"] for c in row)
+                   for p, _ in dated for t in p.tables)
     snip = page.snippet(re.escape(latest.strftime("%d/%m/%Y"))) or latest.isoformat()
     ev = [page_ev(page, snip, kind="texto", data_mais_recente=latest.isoformat(), dias=age)]
     if age <= limits["atende"]:
@@ -386,6 +398,12 @@ def r_4_6(ctx: Context) -> Result:
     if age <= limits["parcial"]:
         return Result("4.6", "parcial", 0.7, f"Registro mais recente de {latest:%d/%m/%Y} ({age} dias): "
                       f"acima de {limits['atende']} dias.", ev)
+    if not in_table:
+        # Ajuste da validação manual (Rio): a data antiga vinha do texto da página, não dos registros;
+        # os demonstrativos estavam atualizados. Desatualização só se afirma com datas de registros.
+        return Result("4.6", "inconclusivo", 0.45, f"Data mais recente encontrada ({latest:%d/%m/%Y}, {age} dias) "
+                      "vem do texto da página, não de registros tabulados; não comprova a desatualização.",
+                      ev, needs_review=True)
     return Result("4.6", "nao_atende", 0.65, f"Registro mais recente de {latest:%d/%m/%Y} ({age} dias): "
                   "informações desatualizadas.", ev, needs_review=True)
 

@@ -196,6 +196,8 @@ def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: i
         return dom if dom == site_domain or url == site else _base_host(url)
 
     allowed = {h for h in (scope(site), scope(portal)) if h}
+    # Outros domínios oficiais da mesma entidade (ex.: Rio publica execução no Contas Rio, em rio.rj.gov.br).
+    allowed |= {registrable_domain("https://" + d) for d in entity.get("dominios_adicionais", [])}
     counter = itertools.count()
     queue: list = []
     seen: set[str] = set()

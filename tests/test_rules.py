@@ -200,3 +200,58 @@ def test_absence_is_inconclusive_when_budget_ends_with_theme_links_pending():
     results = {r.criterion_id: r for r in evaluate(entity, col, today=TODAY)}
     assert results["12.1"].status == "parcial"                # link para RGF visto, arquivo não alcançado
     assert results["19.5"].status == "inconclusivo" and "limite de páginas" in results["19.5"].finding
+
+
+def _eval(pages, **entity_extra):
+    entity = {"id": "v", "nome": "V", "tipo": "executivo_municipal", "site": "https://v.rj.gov.br", "portal": None,
+              **entity_extra}
+    col = collect(entity, FixtureFetcher(pages))
+    return {r.criterion_id: r for r in evaluate(entity, col, today=TODAY)}, col
+
+
+def _base_site(extra_pages: dict, home_extra: str = "") -> dict:
+    """Portal com 11 páginas (coleta suficiente) e área de despesas alcançada."""
+    names = ["despesas", "receitas", "licitacoes", "contratos", "servidores", "diarias", "obras", "ouvidoria",
+             "dados-abertos", "e-sic", "lgpd"]
+    links = "".join(f'<a href="https://v.rj.gov.br/{n}">{n.replace("-", " ").title()}</a>' for n in names)
+    pages = {"https://v.rj.gov.br": f"<html><title>Portal da Transparência</title>{links}{home_extra}</html>"}
+    for n in names:
+        pages[f"https://v.rj.gov.br/{n}"] = f"<html><title>{n.title()} - Portal da Transparência</title></html>"
+    pages.update(extra_pages)
+    return pages
+
+
+def test_validation_fix_menu_mention_is_partial_not_absence():
+    """Japeri: menu do portal oferece 'PPA - Planejamento Plurianual' sem <a href> (SPA)."""
+    menu = '<div class="menu"><span>PPA - Planejamento Plurianual</span><span>LOA - Lei Orçamentária Anual</span></div>'
+    results, _ = _eval(_base_site({}, home_extra=menu))
+    assert results["19.1"].status == "parcial" and results["19.5"].status == "parcial"
+    assert results["20.1"].status == "nao_atende"   # sem menção alguma: ausência continua decidível
+
+
+def test_validation_fix_breadcrumb_without_css_class():
+    """Japeri: trilha 'Painel COVID-19 » Despesas Realizadas' sem classe breadcrumb."""
+    from src.page import parse_html
+    html = b"<html><body><div><span>Painel COVID-19</span> \xc2\xbb <span>Despesas Realizadas</span></div>" \
+           b"<a href='/x'>Leia mais \xc2\xbb</a></body></html>"
+    page = parse_html(url="https://v/x", final_url=None, status=200, fetched_at="", body=html)
+    assert "Despesas Realizadas" in page.breadcrumb
+
+
+def test_validation_fix_old_date_in_text_does_not_prove_outdated_data():
+    """Rio: data antiga no texto da página de despesas não prova desatualização dos registros."""
+    page = "<html><title>Despesas</title><p>Página publicada em 30/04/2025.</p></html>"
+    results, _ = _eval(_base_site({"https://v.rj.gov.br/despesas": page}))
+    assert results["4.6"].status == "inconclusivo"
+
+
+def test_validation_fix_additional_official_domain_is_followed():
+    """Rio: o portal aponta o Contas Rio (rio.rj.gov.br) para execução e dados abertos."""
+    pages = _base_site({"https://www.rio.rj.gov.br/web/contasrio/despesas":
+                        "<html><title>Despesas - Contas Rio</title></html>"},
+                       home_extra='<a href="https://www.rio.rj.gov.br/web/contasrio/despesas">Despesas (Contas Rio)</a>')
+    f = FixtureFetcher(pages)
+    entity = {"id": "v", "nome": "V", "site": "https://v.rj.gov.br", "portal": None,
+              "dominios_adicionais": ["rio.rj.gov.br"]}
+    collect(entity, f)
+    assert "https://www.rio.rj.gov.br/web/contasrio/despesas" in f.calls

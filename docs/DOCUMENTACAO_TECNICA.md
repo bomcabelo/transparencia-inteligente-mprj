@@ -180,6 +180,48 @@ Depois de um ajuste, `python -m src.validacao --anterior data\validacao.xlsx --s
 
 O ciclo é: conferir → ajustar a regra (registrando na aba **Ajustes**) → `python -m src.pipeline reevaluate --latest` (sem acessar os portais) → exportar de novo e comparar. Os resultados dessa validação devem ser reportados junto com o score, e calibram os valores de confiança (§5.4).
 
+#### 5.5.1 Resultados da validação (17/10/2026)
+
+**Amostra:** Rio de Janeiro e Japeri, os 27 critérios automatizados de cada um (54 linhas). Cada linha foi conferida manualmente nos portais, de forma independente da resposta do robô. A planilha conferida está em `docs/validacao/validacao_2026-10-17_rio_japeri.xlsx`.
+
+| Métrica | Valor | Leitura |
+|---|---|---|
+| Linhas conferidas | 54 de 54 | 100% |
+| Pares conclusivos (robô e humano decidiram) | 42 | |
+| Concordância exata | **76,2%** (32 de 42) | |
+| Kappa de Cohen | **0,55** | Concordância moderada, além do acaso |
+| Precisão do "atende" | **100%** (24 de 24) | Nenhum falso "atende": quando o robô afirma que existe, existe |
+| Falsos "não atende" | **8** (de 8 "não atende" conferidos) | Precisão do "não atende" = 0%: todo "não atende" do robô estava errado |
+| Divergências de grau | 2 | Robô "parcial", humano "atende" (RGF e LGPD no Rio) |
+| Inconclusivos do robô | 11 (20,4%) | 8 resolvidos pelo humano; 3 o humano também não conseguiu verificar |
+
+Por município: Rio de Janeiro com 17 acertos em 21 pares e 2 falsos "não atende"; Japeri com 15 acertos em 21 pares e 6 falsos "não atende".
+
+**Leitura dos resultados.** O robô é confiável quando afirma presença e não confiável quando afirma ausência. Esse padrão é o esperado para uma coleta automatizada, porque achar uma evidência basta para afirmar presença, mas afirmar ausência exige ter olhado em todos os lugares. É também o erro mais grave numa fiscalização. Por isso a metodologia já trata ausência com cautela (§5.2), e a validação mostrou que essa cautela ainda era insuficiente.
+
+**Causas registradas pelo avaliador nas divergências:**
+
+| Causa | Ocorrências |
+|---|---|
+| Crawler não chegou à página | 10 |
+| Informação em sistema externo/consulta | 5 |
+| Regra: falso indício | 2 |
+| Conteúdo dinâmico (JavaScript) | 1 |
+| Outro | 1 |
+
+**Ajustes feitos a partir da validação**, um para cada causa dos falsos "não atende":
+
+| Falso "não atende" | Causa | Ajuste |
+|---|---|---|
+| Japeri: PPA, LDO, LOA, RREO, RGF (5) | O menu do portal oferece os itens, mas por botões sem link (SPA); os arquivos são consulta dinâmica | Menção ao documento no portal passa a ser `parcial` (indício), nunca "não atende" |
+| Japeri: trilha de navegação (16.1) | Trilha "Painel COVID-19 » Despesas Realizadas" sem classe CSS de breadcrumb | Trilha também reconhecida por separadores `»`/`›` |
+| Rio: despesa desatualizada (4.6) | Data antiga vinha do texto da página; os demonstrativos estavam em dia | Desatualização só se afirma com datas de registros tabulados; data só no texto → `inconclusivo` |
+| Rio: formatos de despesa (4.5) | Exportação em CSV/TXT no Contas Rio (`rio.rj.gov.br`), outro domínio oficial | Cadastro aceita `dominios_adicionais` por entidade; Rio inclui `rio.rj.gov.br` |
+
+Cada ajuste tem um teste automatizado que reproduz o caso real. Os quatro primeiros valem no reprocessamento das coletas guardadas, sem acessar os portais (`python -m src.pipeline reevaluate --latest`). O do Rio exige nova coleta. As métricas depois dos ajustes são medidas com a mesma conferência humana (`python -m src.validacao --anterior`), sem refazer a validação.
+
+**Limitações da validação.** É uma amostra pequena (2 municípios, 54 critérios), conferida por um único avaliador, e os ajustes foram feitos sobre a mesma amostra. As métricas depois dos ajustes, portanto, superestimam o desempenho em municípios novos. O próximo passo é validar Duque de Caxias, Itaboraí e Cachoeiras de Macacu sem novos ajustes, como amostra de teste, e com um segundo avaliador em parte das linhas, para medir a concordância entre humanos.
+
 ### 5.6 Data de referência
 
 Critérios temporais (ex.: 4.6) comparam com a **data da coleta**, não com "hoje". Reprocessar uma coleta antiga no futuro produz o mesmo resultado.
@@ -387,7 +429,7 @@ Status sempre com ícone e rótulo, nunca só cor. Tema escuro em `.streamlit/co
 - **Visibilidade na capa (1.2).** Sem renderização, verifica-se a existência do link, não o destaque visual.
 - **Pesos e limites** (pesos 3/2/1, 7/45 dias, faixas) são propostas defensáveis, mas precisam de validação com especialistas do GATE/MPRJ. Estão em configuração justamente por isso.
 - **Confiança heurística**, ainda não calibrada contra avaliação humana (§5.4).
-- **Validação real.** Os testes automatizados usam um portal sintético (`src/demo.py`) e HTML controlado. A execução contra os sete municípios deve ser feita no ambiente do avaliador (`python -m src.pipeline run`), e as primeiras execuções precisam de revisão manual das evidências, com a planilha de validação (§5.5).
+- **Validação real.** A primeira validação manual (Rio e Japeri, 54 critérios) mostrou 100% de precisão no "atende" e 0% no "não atende" (8 falsos), com kappa de 0,55 (§5.5.1). As causas foram corrigidas, mas a amostra é pequena e serviu também para os ajustes, então é preciso validar outros municípios como amostra de teste.
 - **Bloqueio por firewall.** Em 15/10/2026, o firewall do site de Itaboraí (Wordfence) bloqueou o IP do avaliador depois de execuções seguidas: capa, sitemap e cerca de 40 páginas em menos de uma hora, com intervalo de 1 s. A versão então vigente insistia 3 vezes em respostas 503. Correções: parar ao primeiro sinal de limite, intervalo e número máximo de páginas configuráveis por entidade (Itaboraí: 5 s e 25 páginas) e nunca contornar o bloqueio. Em produção, o mesmo vale com mais força: token bucket por domínio, janelas noturnas e IP institucional identificado, com contato publicado.
 - **Assinaturas de fornecedor** são padrões textuais e podem gerar falso positivo. A primeira versão marcava "Agili" em qualquer texto com "agilidade"; hoje as assinaturas exigem palavra inteira ou domínio.
 - **Domínios oficiais** de Niterói e Maricá estão cadastrados como inativos até confirmação.
