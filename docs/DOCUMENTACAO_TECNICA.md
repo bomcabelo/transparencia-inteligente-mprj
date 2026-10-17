@@ -241,9 +241,30 @@ Dois ajustes não surtiram efeito na coleta real, e a segunda rodada de correç�
 | Japeri: trilha (16.1) | A trilha do portal foi diluída pelas páginas do site institucional, sem trilha, no cálculo da proporção; o separador `»` também pode estar num elemento próprio | Proporção medida nas páginas do portal quando ele tem páginas internas; a busca do separador sobe até 3 níveis na árvore |
 | Rio: formatos de despesa (4.5) | Com 40 páginas a coleta esgotou antes de chegar ao Contas Rio | Limite do Rio elevado para 80 páginas; se as páginas de despesa apontam sistema externo não visitado, o resultado é `inconclusivo` |
 
-As duas correções têm testes que reproduzem os casos. A conferência desta segunda rodada exige nova coleta e não está incluída nos números acima.
+As duas correções têm testes que reproduzem os casos.
 
-**Limitações da validação.** É uma amostra pequena (2 municípios, 54 critérios), conferida por um único avaliador, e os ajustes foram feitos sobre a mesma amostra. As métricas depois dos ajustes, portanto, superestimam o desempenho em municípios novos. O próximo passo é validar Duque de Caxias, Itaboraí e Cachoeiras de Macacu sem novos ajustes, como amostra de teste, e com um segundo avaliador em parte das linhas, para medir a concordância entre humanos.
+**Rodada 2 (17/10/2026).** Nova coleta, com o Rio já limitado a 80 páginas (`docs/validacao/validacao_2026-10-17_rodada2.xlsx`). Quatro resultados mudaram, todos no Rio:
+
+| Critério | Rodada 1 | Rodada 2 | Avaliador |
+|---|---|---|---|
+| 4.5 Formatos de despesa | não atende | inconclusivo (link do Contas Rio visto, não visitado) | atende |
+| 20.1 RREO | inconclusivo | parcial (link nos quadros da LRF) | atende |
+| 19.3 LDO | parcial | atende (61 PDFs, incluindo a LDO 2027, Lei 9.535/2026) | atende* |
+| 19.5 LOA | parcial | atende (62 PDFs, incluindo a LOA 2026, Lei 9.276/2026) | atende* |
+
+\* O avaliador tinha marcado "parcial" por ver só o link no portal. Com os arquivos que o robô alcançou, abriu os PDFs, confirmou que são as leis vigentes e revisou para "atende" (os anexos são avaliados nos critérios 19.4 e 19.6). A revisão está registrada na planilha. Com o rótulo revisado, a rodada 1 teria dois erros de grau a mais nesses critérios.
+
+| Métrica | Inicial | Rodada 1 | Rodada 2 |
+|---|---|---|---|
+| Concordância exata | 76,2% (32/42) | 90,2% (37/41) | **90,2%** (37/41) |
+| Kappa de Cohen | 0,55 | 0,80 | **0,78** |
+| Precisão do "atende" | 100% (24/24) | 100% (24/24) | **100%** (26/26) |
+| Falsos "não atende" | 8 | 2 | **1** |
+| Inconclusivos | 11 | 12 | 12 |
+
+As 4 divergências restantes: três de grau, com o robô em "parcial" e o humano em "atende" (Rio 12.1 RGF, 18.1 LGPD e 20.1 RREO, em que o robô viu o link mas não o arquivo), e um falso "não atende" (Japeri 16.1). Este último persiste porque a página do portal com a trilha (`portal-transparencia/covid-19/despesas`) não está entre as 80 páginas coletadas: as páginas internas alcançadas no domínio do GeoSIAP são telas do sistema administrativo (`/pmjaperi/websis/...`), sem trilha. A correção do reconhecimento está testada, mas só terá efeito quando a coleta alcançar as páginas de conteúdo do portal.
+
+**Limitações da validação.** É uma amostra pequena (2 municípios, 54 critérios), conferida por um único avaliador, e os ajustes foram feitos sobre a mesma amostra. As métricas depois dos ajustes, portanto, superestimam o desempenho em municípios novos. Além disso, dois rótulos humanos foram revistos depois de o robô apontar os arquivos: a revisão foi feita sobre os documentos, mas mostra que o avaliador também erra por não ter chegado à página. O próximo passo é validar Duque de Caxias, Itaboraí e Cachoeiras de Macacu sem novos ajustes, como amostra de teste, e com um segundo avaliador em parte das linhas, para medir a concordância entre humanos.
 
 ### 5.6 Data de referência
 
@@ -452,7 +473,7 @@ Status sempre com ícone e rótulo, nunca só cor. Tema escuro em `.streamlit/co
 - **Visibilidade na capa (1.2).** Sem renderização, verifica-se a existência do link, não o destaque visual.
 - **Pesos e limites** (pesos 3/2/1, 7/45 dias, faixas) são propostas defensáveis, mas precisam de validação com especialistas do GATE/MPRJ. Estão em configuração justamente por isso.
 - **Confiança heurística**, ainda não calibrada contra avaliação humana (§5.4).
-- **Validação real.** A primeira validação manual (Rio e Japeri, 54 critérios) mostrou 100% de precisão no "atende" e 0% no "não atende" (8 falsos), com kappa de 0,55. Depois dos ajustes, a concordância subiu de 76,2% para 90,2%, o kappa para 0,80 e os falsos "não atende" caíram para 2 (§5.5.1). Mas a amostra é pequena e serviu também para os ajustes, então é preciso validar outros municípios como amostra de teste.
+- **Validação real.** A primeira validação manual (Rio e Japeri, 54 critérios) mostrou 100% de precisão no "atende" e 0% no "não atende" (8 falsos), com kappa de 0,55. Depois de duas rodadas de ajustes, a concordância subiu de 76,2% para 90,2%, o kappa para 0,78, a precisão do "atende" ficou em 100% e os falsos "não atende" caíram de 8 para 1 (§5.5.1). Mas a amostra é pequena e serviu também para os ajustes, então é preciso validar outros municípios como amostra de teste.
 - **Bloqueio por firewall.** Em 15/10/2026, o firewall do site de Itaboraí (Wordfence) bloqueou o IP do avaliador depois de execuções seguidas: capa, sitemap e cerca de 40 páginas em menos de uma hora, com intervalo de 1 s. A versão então vigente insistia 3 vezes em respostas 503. Correções: parar ao primeiro sinal de limite, intervalo e número máximo de páginas configuráveis por entidade (Itaboraí: 5 s e 25 páginas) e nunca contornar o bloqueio. Em produção, o mesmo vale com mais força: token bucket por domínio, janelas noturnas e IP institucional identificado, com contato publicado.
 - **Assinaturas de fornecedor** são padrões textuais e podem gerar falso positivo. A primeira versão marcava "Agili" em qualquer texto com "agilidade"; hoje as assinaturas exigem palavra inteira ou domínio.
 - **Domínios oficiais** de Niterói e Maricá estão cadastrados como inativos até confirmação.
