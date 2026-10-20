@@ -30,11 +30,17 @@ USER_AGENT = os.environ.get(
 
 
 def utc_now() -> str:
+    """Data e hora atuais em UTC, no formato ISO 8601."""
     return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass
 class FetchResult:
+    """Resultado de uma requisição: status, conteúdo, redirecionamentos e erros.
+
+    `error` é preenchido em vez de lançar exceção, para que a coleta registre a falha como evidência
+    de indisponibilidade. `rate_limited` indica que o servidor pediu para parar (429/503).
+    """
     url: str
     final_url: str | None = None
     status: int | None = None
@@ -59,10 +65,17 @@ class FetchResult:
 
 
 class Fetcher(Protocol):
+    """Interface comum dos fetchers (HTTP, Playwright, fixtures): `fetch(url) -> FetchResult`."""
     def fetch(self, url: str) -> FetchResult: ...
 
 
 class HttpFetcher:
+    """Cliente HTTP "educado" usado na coleta real.
+
+    Identifica-se no User-Agent, respeita o robots.txt, espera `delay` segundos entre requisições ao
+    mesmo host (seguro entre threads), recusa localhost e IPs privados, limita o
+    tamanho da resposta e não insiste quando o servidor sinaliza limite de acesso.
+    """
     def __init__(self, *, delay: float = 1.0, timeout: float = 20, max_bytes: int = 3_000_000,
                  retries: int = 3, respect_robots: bool = True, session: requests.Session | None = None,
                  max_redirects: int = 5):
@@ -86,6 +99,7 @@ class HttpFetcher:
             time.sleep(wait)
 
     def allowed(self, url: str) -> bool:
+        """Indica se o robots.txt do site permite a URL. Sem robots.txt (ou inacessível), permite."""
         if not self.respect_robots:
             return True
         parts = urlsplit(url)

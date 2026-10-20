@@ -27,6 +27,10 @@ log = logging.getLogger("scheduler")
 
 
 def loop(interval_hours: float, workers: int, once: bool = False) -> None:
+    """Executa o pipeline a cada `interval_hours`, com pequena variação aleatória.
+
+    Uma execução com erro é registrada no log e não interrompe o agendador.
+    """
     while True:
         started = time.monotonic()
         try:
@@ -43,6 +47,7 @@ def loop(interval_hours: float, workers: int, once: bool = False) -> None:
 
 
 def main() -> None:
+    """CLI: `python -m src.scheduler --interval-hours 720 [--once]`."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     p = argparse.ArgumentParser(description="Agendador simples do pipeline")
     p.add_argument("--interval-hours", type=float, default=24 * 30)

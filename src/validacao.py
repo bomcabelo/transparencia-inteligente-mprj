@@ -330,6 +330,13 @@ def _carry_over(wb: Workbook, previous: Path) -> dict:
 
 
 def export(output: Path, slugs: list[str] | None = None, db_path=None, previous: Path | None = None) -> int:
+    """Gera a planilha de validação manual robô × humano e devolve o número de linhas.
+
+    Uma linha por critério aplicável e automatizado da última avaliação de cada entidade. As métricas
+    (concordância, falsos "não atende", kappa, matriz de confusão) são fórmulas do Excel, recalculadas
+    à medida que o avaliador preenche. Com `previous`, as respostas de uma planilha já conferida são
+    reaproveitadas, e as linhas cujo status do robô mudou ficam destacadas.
+    """
     with repo.connect(db_path) as db:
         rows = _rows(db, slugs)
     rows.sort(key=lambda r: (r[0], tuple(int(p) for p in r[3].split("."))))
@@ -356,6 +363,7 @@ def export(output: Path, slugs: list[str] | None = None, db_path=None, previous:
 
 
 def main() -> None:
+    """CLI: `python -m src.validacao [--entity id] [--saida arquivo] [--anterior conferida.xlsx]`."""
     p = argparse.ArgumentParser(description="Gera planilha de validação manual robô × humano")
     p.add_argument("--entity", action="append", help="slug da entidade (repetível); padrão: todas")
     p.add_argument("--saida", type=Path, default=Path(f"data/validacao_{date.today():%Y%m%d}.xlsx"))

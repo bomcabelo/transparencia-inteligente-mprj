@@ -19,6 +19,20 @@ from src.rules.base import REGISTRY, Context, Result
 def evaluate(entity: dict, collection: Collection, *, catalog: dict | None = None,
              methodology: dict | None = None, llm=None, extra_evidence: dict | None = None,
              today: date | None = None) -> list[Result]:
+    """Aplica o checklist inteiro a uma coleta e devolve um `Result` por critério do catálogo.
+
+    A data de referência é a da coleta (não a de hoje), para que reprocessar uma coleta antiga dê o
+    mesmo resultado. Resultado conclusivo com confiança abaixo de `confianca_minima` vira
+    `inconclusivo`, com o status original registrado no achado. Erro numa regra também vira
+    `inconclusivo`, sem interromper as demais.
+
+    Args:
+        entity: cadastro da entidade (o `tipo` define a aplicabilidade).
+        collection: páginas coletadas (`collector.collect` ou `repository.load_collection`).
+        llm: juiz de IA opcional (`LLMJudge`), usado só por regras semânticas.
+        extra_evidence: evidências de adaptadores de fornecedor (ex.: API do GeoSIAP).
+        today: data de referência explícita (testes).
+    """
     catalog = catalog or load_catalog()
     methodology = methodology or load_methodology()
     # Data de referência = data da coleta: reprocessar no futuro produz o mesmo resultado.

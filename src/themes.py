@@ -37,6 +37,7 @@ _COMPILED = {k: [re.compile(p) for p in v] for k, v in THEMES.items()}
 
 
 def score_text(value: str) -> dict[str, float]:
+    """Pontua um texto em cada tema do checklist pelo número de padrões encontrados."""
     text = norm(value)
     out = {}
     for theme, patterns in _COMPILED.items():

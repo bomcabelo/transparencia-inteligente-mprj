@@ -53,6 +53,11 @@ PROBES = {"GeoSIAP": _probe_geosiap}
 
 
 def run_probes(entity: dict, vendors: dict, ref: date) -> tuple[dict, list[dict]]:
+    """Consulta APIs públicas dos fornecedores de portal detectados (hoje: GeoSIAP).
+
+    Returns:
+        (evidências por critério, log das consultas). As evidências complementam a análise do HTML.
+    """
     evidence, log = {}, []
     for vendor, probe in PROBES.items():
         if vendor in vendors or (vendor == "GeoSIAP" and entity.get("geosiap")):

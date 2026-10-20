@@ -22,6 +22,22 @@ def _bucket() -> dict:
 
 def compute(results: list[Result | dict], *, catalog: dict | None = None,
             methodology: dict | None = None) -> dict:
+    """Calcula o score de uma avaliação a partir dos resultados por critério (§6 da documentação).
+
+    - `nao_aplicavel` sai do cálculo; `nao_avaliado` entra só na cobertura do checklist.
+    - `inconclusivo` não entra no score pontual, mas define o intervalo: mínimo (inconclusivos = 0)
+      e máximo (inconclusivos = 1).
+    - Score = média ponderada (atende 1, parcial 0,5, não atende 0; pesos por classificação).
+    - Abaixo de `cobertura_minima_para_score` não há score pontual, só o intervalo.
+
+    Args:
+        results: resultados do motor (`Result` ou dicionários com `criterion_id` e `status`).
+        catalog, methodology: padrão = arquivos em `config/`.
+
+    Returns:
+        Dicionário com score, intervalo, média simples, coberturas, `comparavel` (entra no ranking),
+        classificação, essenciais pendentes, contagem por status, score por categoria e versões.
+    """
     catalog = catalog or load_catalog()
     m = methodology or load_methodology()
     values = m["valor_por_status"]
@@ -84,6 +100,11 @@ def compute(results: list[Result | dict], *, catalog: dict | None = None,
 
 
 def classify(score: float | None, essential_gaps: list[str], m: dict) -> str:
+    """Faixa de classificação do score (`metodologia.json`, `faixas`, em ordem decrescente).
+
+    Uma faixa com `exige_essenciais` só é atribuída se nenhum critério essencial estiver pendente:
+    um score alto com essencial pendente cai para a faixa seguinte.
+    """
     if score is None:
         return "Sem avaliação conclusiva"
     for band in m["faixas"]:

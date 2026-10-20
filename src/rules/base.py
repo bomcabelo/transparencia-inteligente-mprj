@@ -25,6 +25,7 @@ STATUSES = ("atende", "parcial", "nao_atende", "nao_aplicavel", "inconclusivo", 
 
 @dataclass
 class Evidence:
+    """Evidência que sustenta um resultado: onde foi encontrada (URL) e o trecho literal."""
     kind: str  # pagina | link | formulario | tabela | documento | texto | controle | api | ausencia | ia
     url: str | None
     title: str = ""
@@ -34,6 +35,10 @@ class Evidence:
 
 @dataclass
 class Result:
+    """Resultado de um critério: status, confiança (0 a 1), achado em texto e evidências.
+
+    `needs_review` marca resultados que devem passar por revisão humana.
+    """
     criterion_id: str
     status: str
     confidence: float
@@ -55,6 +60,7 @@ class Result:
 
 @dataclass
 class Context:
+    """O que uma regra recebe: entidade, coleta, data de referência, metodologia e IA opcional."""
     entity: dict
     collection: Collection
     today: date
@@ -64,19 +70,23 @@ class Context:
 
     @property
     def pages(self) -> list[Page]:
+        """Páginas válidas da coleta."""
         return self.collection.ok_pages
 
     @property
     def site(self) -> Page | None:
+        """Página inicial do site oficial, se acessível."""
         p = self.collection.page("site")
         return p if p and p.status == 200 else None
 
     @property
     def portal(self) -> Page | None:
+        """Página inicial do portal da transparência, se acessível."""
         p = self.collection.page("portal")
         return p if p and p.status == 200 else None
 
     def themed(self, theme: str, minimum: float = 3.0) -> list[Page]:
+        """Páginas classificadas no tema (ex.: "despesa") com pontuação mínima."""
         return pages_for(self.pages, theme, minimum)
 
 
@@ -85,6 +95,11 @@ REGISTRY: dict[str, dict] = {}
 
 
 def rule(criterion_id: str, *, complexidade: str, tecnica: str, versao: str = "1.0", semantico: bool = False):
+    """Decorador que registra uma função como a regra de um critério do checklist.
+
+    Exemplo: `@rule("4.1", complexidade="dados_estruturados", tecnica="tabelas")`. A docstring da
+    função vira a descrição da regra no catálogo da API.
+    """
     def decorator(func: Rule) -> Rule:
         REGISTRY[criterion_id] = {"func": func, "complexidade": complexidade, "tecnica": tecnica,
                                   "versao": versao, "semantico": semantico, "doc": (func.__doc__ or "").strip()}
@@ -93,6 +108,7 @@ def rule(criterion_id: str, *, complexidade: str, tecnica: str, versao: str = "1
 
 
 def page_ev(page: Page, snippet: str = "", kind: str = "pagina", **detail) -> Evidence:
+    """Evidência apontando para uma página coletada, com trecho opcional."""
     return Evidence(kind=kind, url=page.final_url, title=page.title, snippet=snippet or "", detail=detail)
 
 

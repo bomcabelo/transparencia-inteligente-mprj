@@ -25,6 +25,11 @@ SKIP = re.compile(r"(noticia|galeria|evento|agenda|video|foto|login|logout|wp-ad
 
 @dataclass
 class Collection:
+    """Resultado da coleta de uma entidade: páginas, erros, portal encontrado e diagnóstico.
+
+    Além das páginas, guarda o que é necessário para decidir se a ausência de algo pode ser afirmada:
+    se a coleta foi abortada, se o limite de páginas acabou e quais temas ficaram com links na fila.
+    """
     entity_id: str
     site_url: str | None
     portal_url: str | None
@@ -41,6 +46,7 @@ class Collection:
     pending_themes: dict = field(default_factory=dict)  # temas de links que ficaram na fila sem visita
 
     def page(self, role: str) -> Page | None:
+        """Página-semente do site (`role="site"`) ou do portal (`role="portal"`), se foi coletada."""
         target = self.site_url if role == "site" else self.portal_url
         if not target:
             return None
@@ -52,10 +58,12 @@ class Collection:
 
     @property
     def ok_pages(self) -> list[Page]:
+        """Páginas obtidas com sucesso (HTTP 200, sem erro)."""
         return [p for p in self.pages if p.status == 200 and not p.error]
 
     @property
     def health(self) -> dict:
+        """Diagnóstico da coleta, gravado com a avaliação e mostrado no dashboard."""
         site, portal = self.page("site"), self.page("portal")
         covered = sorted({t for p in self.ok_pages for t, s in p.themes.items() if s >= 3})
         return {
@@ -185,6 +193,16 @@ def sitemap_urls(fetcher: Fetcher, roots: list[str], *, max_files: int = 4) -> l
 
 def collect(entity: dict, fetcher: Fetcher, *, max_pages: int = 40, max_depth: int = 3,
             abort_after: int = 5) -> Collection:
+    """Coleta focada por temas a partir do site e do portal da entidade.
+
+    1. Visita o site e, se o portal não estiver cadastrado, procura o link na capa, no restante do
+       site e no sitemap.
+    2. Segue os links em fila de prioridade: links de temas do checklist ainda não cobertos primeiro.
+    3. Respeita o escopo: domínio registrável da prefeitura, host exato do portal em domínio de
+       fornecedor e `dominios_adicionais` da entidade.
+    4. Para ao atingir `max_pages`, depois de `abort_after` falhas seguidas (circuit breaker) ou no
+       primeiro sinal de limite do servidor (429/503).
+    """
     site, portal = entity.get("site"), entity.get("portal")
     col = Collection(entity_id=entity["id"], site_url=site, portal_url=portal)
     site_domain = registrable_domain(site)

@@ -71,6 +71,7 @@ ENTITY_COLUMNS = {"slug": "TEXT", "tipo": "TEXT", "municipio": "TEXT", "entidade
 
 
 def connect(db_path: str | Path | None = None) -> sqlite3.Connection:
+    """Abre o banco SQLite e cria/atualiza o esquema (tabelas atuais e das etapas anteriores)."""
     db = legacy.connect(db_path)  # cria também as tabelas das etapas anteriores
     db.executescript(SCHEMA)
     existing = {r["name"] for r in db.execute("PRAGMA table_info(entities)")}
@@ -86,6 +87,7 @@ def _j(value) -> str:
 
 # ------------------------------------------------------------------- escrita
 def upsert_entity(db: sqlite3.Connection, e: dict) -> int:
+    """Insere ou atualiza a entidade pelo nome e devolve o id numérico usado na API."""
     db.execute("""INSERT INTO entities(name, uf, site, portal, slug, tipo, municipio, entidade, ativo)
                   VALUES (?,?,?,?,?,?,?,?,?)
                   ON CONFLICT(name) DO UPDATE SET uf=excluded.uf, site=excluded.site, portal=excluded.portal,
@@ -97,6 +99,7 @@ def upsert_entity(db: sqlite3.Connection, e: dict) -> int:
 
 
 def sync_catalog(db: sqlite3.Connection, catalog: dict, registry: dict) -> None:
+    """Grava o catálogo do checklist na versão atual, marcando quais critérios têm regra automatizada."""
     for c in catalog["criterios"]:
         meta = registry.get(c["id"], {})
         db.execute("""INSERT OR REPLACE INTO criteria VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -106,16 +109,22 @@ def sync_catalog(db: sqlite3.Connection, catalog: dict, registry: dict) -> None:
 
 
 def start_run(db: sqlite3.Connection, trigger: str, methodology: str, checklist: str, started_at: str) -> int:
+    """Registra o início de uma execução (lote de entidades) e devolve o id."""
     return db.execute("INSERT INTO runs(started_at, trigger, methodology_version, checklist_version) VALUES (?,?,?,?)",
                       (started_at, trigger, methodology, checklist)).lastrowid
 
 
 def finish_run(db: sqlite3.Connection, run_id: int, finished_at: str, total: int, ok: int, notes: str = "") -> None:
+    """Fecha a execução com o total de entidades e quantas foram avaliadas com sucesso."""
     db.execute("UPDATE runs SET finished_at=?, entities_total=?, entities_ok=?, notes=? WHERE id=?",
                (finished_at, total, ok, notes, run_id))
 
 
 def store_snapshot(entity_slug: str, sha256: str, body: bytes) -> str:
+    """Grava o HTML compactado, endereçado pelo SHA-256 do conteúdo.
+
+    Página inalterada entre coletas não é regravada. Devolve o caminho relativo a `SNAPSHOTS`.
+    """
     folder = SNAPSHOTS / entity_slug
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{sha256}.html.gz"
@@ -128,6 +137,11 @@ def save_assessment(db: sqlite3.Connection, *, run_id: int | None, entity_id: in
                     collection: Collection, results: list[Result], score: dict, evaluated_at: str,
                     probes: list | None = None, kind: str = "coleta", source_assessment_id: int | None = None,
                     llm_log: list | None = None) -> int:
+    """Persiste uma avaliação completa: resumo e score, páginas (com snapshots), resultados e evidências.
+
+    `kind` é `coleta` (nova coleta) ou `reprocessamento` (regras novas sobre coleta guardada, com
+    `source_assessment_id` apontando a original). Devolve o id da avaliação.
+    """
     health = collection.health
     status = ("falhou" if not (health["site_ok"] or health["portal_ok"]) else
               "parcial" if not collection.sufficient else "ok")
@@ -197,6 +211,7 @@ SUMMARY_COLS = """a.id, a.entity_id, a.run_id, a.kind, a.source_assessment_id, a
 
 
 def entities(db: sqlite3.Connection) -> list[dict]:
+    """Lista as entidades com o resumo da avaliação mais recente de cada uma."""
     rows = db.execute(f"""SELECT e.id, e.name, e.slug, e.tipo, e.municipio, e.entidade, e.uf, e.site, e.portal,
         la.score, la.classificacao, la.collected_at AS ultima_avaliacao, la.cobertura_avaliacao, la.comparavel,
         la.collection_status
@@ -207,23 +222,31 @@ def entities(db: sqlite3.Connection) -> list[dict]:
 
 
 def entity(db: sqlite3.Connection, entity_id: int) -> dict | None:
+    """Cadastro de uma entidade, ou None se não existir."""
     row = db.execute("SELECT * FROM entities WHERE id=?", (entity_id,)).fetchone()
     return dict(row) if row else None
 
 
 def history(db: sqlite3.Connection, entity_id: int) -> list[dict]:
+    """Série histórica das avaliações de uma entidade, da mais antiga para a mais recente."""
     rows = db.execute(f"SELECT {SUMMARY_COLS} FROM assessments a WHERE a.entity_id=? "
                       "ORDER BY a.collected_at, a.id", (entity_id,)).fetchall()
     return [dict(r) for r in rows]
 
 
 def latest_id(db: sqlite3.Connection, entity_id: int) -> int | None:
+    """Id da avaliação mais recente da entidade, ou None se ainda não foi avaliada."""
     row = db.execute("SELECT id FROM assessments WHERE entity_id=? ORDER BY collected_at DESC, id DESC LIMIT 1",
                      (entity_id,)).fetchone()
     return row["id"] if row else None
 
 
 def assessment(db: sqlite3.Connection, assessment_id: int, with_evidence: bool = True) -> dict | None:
+    """Avaliação completa: resumo, saúde da coleta, fornecedores, sondas, pontuação e critérios.
+
+    Os campos JSON do banco são devolvidos já decodificados, com nomes em português
+    (`saude_coleta`, `sondas`, `pontuacao`, `ia_log`).
+    """
     a = db.execute(f"SELECT {SUMMARY_COLS}, a.health_json, a.vendors_json, a.probes_json, a.score_json, a.llm_json "
                    "FROM assessments a WHERE a.id=?", (assessment_id,)).fetchone()
     if a is None:
@@ -238,6 +261,7 @@ def assessment(db: sqlite3.Connection, assessment_id: int, with_evidence: bool =
 
 
 def results(db: sqlite3.Connection, assessment_id: int, with_evidence: bool = True) -> list[dict]:
+    """Resultados por critério de uma avaliação, com os dados do catálogo e, opcionalmente, as evidências."""
     a = db.execute("SELECT checklist_version FROM assessments WHERE id=?", (assessment_id,)).fetchone()
     rows = db.execute("""SELECT r.*, c.descricao, c.grupo, c.grupo_id, c.classificacao, c.fundamentacao, c.matriz,
                          c.complexidade FROM results r LEFT JOIN criteria c
@@ -259,6 +283,7 @@ def results(db: sqlite3.Connection, assessment_id: int, with_evidence: bool = Tr
 
 
 def criterion_history(db: sqlite3.Connection, entity_id: int, criterion_id: str) -> list[dict]:
+    """Linha do tempo de um critério numa entidade: status, confiança e achado em cada avaliação."""
     rows = db.execute("""SELECT a.id AS assessment_id, a.collected_at, a.kind, r.status, r.confidence, r.finding,
                          r.rule_version FROM results r JOIN assessments a ON a.id=r.assessment_id
                          WHERE a.entity_id=? AND r.criterion_id=? ORDER BY a.collected_at, a.id""",
@@ -307,10 +332,12 @@ def first_compliance(db: sqlite3.Connection, entity_id: int) -> dict[str, str]:
 
 
 def runs(db: sqlite3.Connection, limit: int = 50) -> list[dict]:
+    """Execuções mais recentes, da última para a primeira."""
     return [dict(r) for r in db.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,))]
 
 
 def criteria(db: sqlite3.Connection, checklist_version: str | None = None) -> list[dict]:
+    """Catálogo do checklist (padrão: versão mais recente), ordenado pelo número do critério."""
     if checklist_version is None:
         row = db.execute("SELECT checklist_version FROM criteria ORDER BY rowid DESC LIMIT 1").fetchone()
         checklist_version = row["checklist_version"] if row else ""

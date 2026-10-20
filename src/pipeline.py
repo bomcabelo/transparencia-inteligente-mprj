@@ -31,6 +31,11 @@ log = logging.getLogger("pipeline")
 
 
 def make_fetcher(methodology: dict, entity: dict | None = None) -> Fetcher:
+    """Cria o fetcher de uma entidade com a política de coleta da metodologia.
+
+    `intervalo_segundos` e `render_js` podem ser definidos por entidade. Sem Playwright instalado,
+    usa HTTP simples, e as regras tratam páginas dinâmicas como `inconclusivo`.
+    """
     c = methodology["coleta"]
     e = entity or {}
     base = HttpFetcher(delay=float(e.get("intervalo_segundos", c["intervalo_segundos"])), timeout=c["timeout_segundos"], max_bytes=c["max_bytes"],
@@ -46,6 +51,11 @@ def make_fetcher(methodology: dict, entity: dict | None = None) -> Fetcher:
 
 def assess(entity: dict, fetcher: Fetcher, *, methodology: dict, catalog: dict, llm=None,
            probes: bool = True) -> tuple[Collection, list, dict, list]:
+    """Coleta, sonda APIs de fornecedores, avalia e pontua uma entidade (sem gravar no banco).
+
+    Returns:
+        (coleta, resultados por critério, score, log das sondas).
+    """
     c = methodology["coleta"]
     try:
         col = collect(entity, fetcher, max_pages=int(entity.get("max_paginas", c["max_paginas"])), max_depth=c["max_profundidade"],
@@ -68,6 +78,11 @@ def assess(entity: dict, fetcher: Fetcher, *, methodology: dict, catalog: dict, 
 
 def run(entity_ids: list[str] | None = None, *, workers: int = 3, trigger: str = "manual",
         fetcher_factory=None, db_path=None, entities: list[dict] | None = None, probes: bool = True) -> int:
+    """Executa o pipeline completo para as entidades ativas (ou as indicadas) e grava no banco.
+
+    Entidades são processadas em paralelo (`workers`), cada uma com seu próprio fetcher. Falha em
+    uma entidade não interrompe as outras. Devolve o id da execução.
+    """
     methodology, catalog = load_methodology(), load_catalog()
     pool = entities if entities is not None else load_entities()
     if entity_ids:
@@ -170,6 +185,7 @@ def diagnose(slug: str, db_path=None) -> None:
 
 
 def main() -> None:
+    """CLI: subcomandos `run`, `reevaluate` e `diagnostico` (ver README)."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Pipeline de avaliação de portais de transparência")
     sub = parser.add_subparsers(dest="cmd", required=True)

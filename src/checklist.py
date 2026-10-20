@@ -56,6 +56,12 @@ def _clean(value) -> str:
 
 
 def parse_xlsx(path: Path) -> list[dict]:
+    """Lê a aba "Quesitos" da planilha do checklist e devolve um dicionário por critério.
+
+    Reconstrói o que a planilha expressa só pela posição das linhas: seção e matriz (comum ×
+    Executivo), grupo, fundamentação herdada de células mescladas, classificação
+    (essencial/obrigatória/recomendada) e tipos de entidade aos quais o critério se aplica.
+    """
     from openpyxl import load_workbook
 
     ws = load_workbook(path, read_only=True, data_only=True)["Quesitos"]
@@ -108,6 +114,7 @@ def parse_xlsx(path: Path) -> list[dict]:
 
 
 def build_catalog(xlsx: Path = XLSX_DEFAULT, output: Path = CATALOG) -> dict:
+    """Gera `config/checklist.json` a partir da planilha. A versão é o hash do arquivo de origem."""
     raw = xlsx.read_bytes()
     catalog = {
         "versao": "checklist-" + hashlib.sha256(raw).hexdigest()[:12],
@@ -121,6 +128,7 @@ def build_catalog(xlsx: Path = XLSX_DEFAULT, output: Path = CATALOG) -> dict:
 
 @lru_cache(maxsize=4)
 def load_catalog(path: str | None = None) -> dict:
+    """Carrega o catálogo do checklist (com índice `por_id`). Resultado em cache."""
     catalog = json.loads(Path(path or CATALOG).read_text(encoding="utf-8"))
     catalog["por_id"] = {c["id"]: c for c in catalog["criterios"]}
     return catalog
@@ -128,20 +136,24 @@ def load_catalog(path: str | None = None) -> dict:
 
 @lru_cache(maxsize=4)
 def load_methodology(path: str | None = None) -> dict:
+    """Carrega `config/metodologia.json` (pesos, faixas, limites de coleta). Resultado em cache."""
     return json.loads(Path(path or METHODOLOGY).read_text(encoding="utf-8"))
 
 
 def weight(criterion: dict, methodology: dict | None = None) -> float:
+    """Peso do critério: o peso individual em `pesos_por_criterio`, se houver; senão, o da classificação."""
     m = methodology or load_methodology()
     override = m.get("pesos_por_criterio", {}).get(criterion["id"])
     return float(override if override is not None else m["pesos_por_classificacao"][criterion["classificacao"]])
 
 
 def applicable(criterion: dict, entity_type: str) -> bool:
+    """Indica se o critério se aplica ao tipo de entidade (ex.: LOA não se aplica a uma Câmara)."""
     return entity_type in criterion["aplicavel_a"]
 
 
 def main() -> None:
+    """CLI: `python -m src.checklist` reimporta a planilha e mostra um resumo do catálogo."""
     parser = argparse.ArgumentParser(description="Gera config/checklist.json a partir da planilha")
     parser.add_argument("--xlsx", type=Path, default=XLSX_DEFAULT)
     parser.add_argument("--output", type=Path, default=CATALOG)

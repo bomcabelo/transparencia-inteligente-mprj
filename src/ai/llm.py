@@ -47,6 +47,11 @@ def _ws(value: str) -> str:
 
 
 class LLMJudge:
+    """Juiz de IA opcional para critérios semânticos (§11 da documentação).
+
+    Recebe só trechos pré-filtrados, exige citação literal do texto (conferida contra os trechos),
+    tem cache por hash do prompt e teto de chamadas por execução. Desligado por padrão.
+    """
     def __init__(self, *, provider: str, model: str, transport: Transport | None = None,
                  api_key: str | None = None, max_calls: int = 50, cache_dir: Path | None = CACHE_DIR):
         self.provider, self.model, self.api_key = provider, model, api_key
@@ -56,6 +61,7 @@ class LLMJudge:
 
     @classmethod
     def from_env(cls) -> "LLMJudge | None":
+        """Cria o juiz a partir das variáveis de ambiente, ou None se a IA não estiver configurada."""
         provider = os.environ.get("MPRJ_LLM_PROVIDER", "").strip().lower()
         model = os.environ.get("MPRJ_LLM_MODEL", "").strip()
         if provider not in {"anthropic", "openai"} or not model:
@@ -86,6 +92,12 @@ class LLMJudge:
 
     # -- julgamento ------------------------------------------------------------
     def judge(self, criterion_id: str, question: str, snippets: list[dict]) -> dict | None:
+        """Pergunta ao modelo se os trechos atendem ao critério.
+
+        Devolve o veredito validado, ou None quando não há resposta utilizável (teto atingido, erro,
+        citação que não aparece nos trechos ou veredito inconclusivo). Toda chamada fica registrada
+        em `self.log`.
+        """
         user = json.dumps({"criterio": criterion_id, "pergunta": question,
                            "trechos": [{"url": s["url"], "texto": s["texto"][:1500]} for s in snippets[:6]]},
                           ensure_ascii=False)

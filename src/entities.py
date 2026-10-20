@@ -49,10 +49,15 @@ def infer_entity_type(name: str, url: str | None = None) -> tuple[str | None, fl
 
 
 def slugify(value: str) -> str:
+    """Identificador em minúsculas, sem acentos e com hifens (ex.: "Duque de Caxias" -> "duque-de-caxias")."""
     return re.sub(r"[^a-z0-9]+", "-", _norm(value)).strip("-")
 
 
 def normalize_entity(raw: dict) -> dict:
+    """Completa o cadastro com valores padrão e infere o tipo da entidade quando não informado.
+
+    O tipo inferido com confiança abaixo de 0,8 fica marcado como `requer_confirmacao`.
+    """
     entity = dict(raw)
     entity.setdefault("id", slugify(raw["nome"]))
     entity.setdefault("entidade", raw["nome"])
@@ -70,5 +75,6 @@ def normalize_entity(raw: dict) -> dict:
 
 
 def load_entities(path: Path | str = ENTITIES_FILE, only_active: bool = True) -> list[dict]:
+    """Carrega `config/municipios.json`. Por padrão, só as entidades ativas."""
     rows = [normalize_entity(r) for r in json.loads(Path(path).read_text(encoding="utf-8"))]
     return [r for r in rows if r["ativo"] or not only_active]

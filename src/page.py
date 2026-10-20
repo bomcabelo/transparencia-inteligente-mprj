@@ -42,6 +42,9 @@ def norm(value: str) -> str:
 
 @dataclass
 class Page:
+    """Representação estruturada de uma página: texto, links, formulários, tabelas, documentos,
+    trilha de navegação e controles de acessibilidade. É sobre ela que as regras trabalham.
+    """
     url: str
     final_url: str
     status: int | None
@@ -68,12 +71,14 @@ class Page:
 
     @property
     def ntext(self) -> str:
+        """Texto normalizado (sem acentos, minúsculo), para buscas por expressão regular."""
         if not hasattr(self, "_ntext"):
             object.__setattr__(self, "_ntext", norm(self.text))
         return self._ntext  # type: ignore[attr-defined]
 
     @property
     def host(self) -> str:
+        """Host da URL final da página."""
         return urlsplit(self.final_url or self.url).hostname or ""
 
     def looks_dynamic(self) -> bool:
@@ -90,6 +95,7 @@ class Page:
         return re.sub(r"\s+", " ", self.text[start:end]).strip()
 
     def to_dict(self) -> dict:
+        """Representação serializável, sem o texto integral."""
         data = asdict(self)
         data.pop("text")
         return data
@@ -111,6 +117,12 @@ def _label_for(soup, field_tag) -> str:
 
 def parse_html(*, url: str, final_url: str | None, status: int | None, fetched_at: str,
                body: bytes, depth: int = 0, renderer: str = "http") -> Page:
+    """Converte o HTML bruto em `Page`.
+
+    Extrai título, texto, cabeçalhos, links (com rotas de SPA preservadas), formulários, tabelas,
+    links para documentos, controles de acessibilidade e trilha de navegação (por classe CSS,
+    "Você está aqui" ou separadores » e ›).
+    """
     page = Page(url=url, final_url=final_url or url, status=status, fetched_at=fetched_at,
                 sha256=hashlib.sha256(body).hexdigest(), depth=depth, renderer=renderer)
     soup = BeautifulSoup(body, "html.parser")

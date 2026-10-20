@@ -28,6 +28,7 @@ def _entity_or_404(db, entity_id: int) -> dict:
 
 @app.get("/health", tags=["Sistema"])
 def health() -> dict:
+    """Verifica se a API está no ar: total de avaliações gravadas e data da última execução."""
     with repo.connect() as db:
         n = db.execute("SELECT COUNT(*) n FROM assessments").fetchone()["n"]
         last = db.execute("SELECT MAX(finished_at) t FROM runs").fetchone()["t"]
@@ -74,12 +75,14 @@ def overview() -> dict:
 
 @app.get("/entities", tags=["Entidades"])
 def list_entities() -> list[dict]:
+    """Entidades cadastradas, com o resultado da avaliação mais recente."""
     with repo.connect() as db:
         return repo.entities(db)
 
 
 @app.get("/entities/{entity_id}", tags=["Entidades"])
 def get_entity(entity_id: int) -> dict:
+    """Cadastro de uma entidade."""
     with repo.connect() as db:
         value = _entity_or_404(db, entity_id)
         value["avaliacoes"] = len(repo.history(db, entity_id))
@@ -88,6 +91,7 @@ def get_entity(entity_id: int) -> dict:
 
 @app.get("/entities/{entity_id}/evaluations/latest", tags=["Avaliações"])
 def latest_evaluation(entity_id: int, evidencias: bool = True) -> dict:
+    """Avaliação mais recente da entidade, com critérios e (opcionalmente) evidências."""
     with repo.connect() as db:
         _entity_or_404(db, entity_id)
         aid = repo.latest_id(db, entity_id)
@@ -122,6 +126,7 @@ def evaluation_diff(entity_id: int, de: int | None = Query(None), para: int | No
 
 @app.get("/entities/{entity_id}/evaluations/{assessment_id}", tags=["Avaliações"])
 def get_evaluation(entity_id: int, assessment_id: int) -> dict:
+    """Uma avaliação específica da entidade, com critérios e evidências."""
     with repo.connect() as db:
         _entity_or_404(db, entity_id)
         value = repo.assessment(db, assessment_id)
@@ -147,6 +152,7 @@ def entity_criteria(entity_id: int, status: str | None = None) -> list[dict]:
 
 @app.get("/entities/{entity_id}/criteria/{criterion_id}/history", tags=["Critérios"])
 def criterion_history(entity_id: int, criterion_id: str) -> list[dict]:
+    """Linha do tempo de um critério na entidade."""
     with repo.connect() as db:
         _entity_or_404(db, entity_id)
         return repo.criterion_history(db, entity_id, criterion_id)
@@ -162,6 +168,7 @@ def catalog(implementado: bool | None = None) -> list[dict]:
 
 @app.get("/runs", tags=["Sistema"])
 def list_runs(limit: int = 50) -> list[dict]:
+    """Execuções do pipeline, da mais recente para a mais antiga."""
     with repo.connect() as db:
         return repo.runs(db, limit)
 
