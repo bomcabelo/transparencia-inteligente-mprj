@@ -1,8 +1,18 @@
 """Painel de conformidade — consome exclusivamente a API (não lê o banco).
 
-Executar:  streamlit run app/dashboard.py   (API em MPRJ_API_URL, padrão http://127.0.0.1:8000)
+Executar:  python iniciar.py   (sobe API e painel juntos)
+       ou: streamlit run app/dashboard.py   (com a API já rodando em MPRJ_API_URL,
+           padrão http://127.0.0.1:8000)
 """
 import os
+import sys
+from pathlib import Path
+
+# `streamlit run app/dashboard.py` põe só a pasta app/ no sys.path; a raiz do projeto é necessária
+# para importar os módulos `app.*` (sem isto, a aba "Por entidade" falhava com ModuleNotFoundError).
+ROOT = str(Path(__file__).resolve().parents[1])
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 import altair as alt
 import pandas as pd

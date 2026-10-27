@@ -205,7 +205,7 @@ def main() -> None:
         return
     if args.cmd == "run":
         run_id = run(args.entity, workers=args.workers, trigger=args.trigger, probes=not args.no_probes)
-        print(f"Execução {run_id} concluída. API: uvicorn api.main:app | painel: streamlit run app/dashboard.py")
+        print(f"Execução {run_id} concluída. Para ver os resultados: python iniciar.py")
     else:
         ids = list(args.assessment or [])
         if args.latest:

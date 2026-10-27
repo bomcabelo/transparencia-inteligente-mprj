@@ -174,7 +174,7 @@ def main() -> None:
     parser.add_argument("--db", type=Path, default=DEMO_DB)
     args = parser.parse_args()
     seed(args.db)
-    print(f"\nBase de demonstração: {args.db}\nDefina MPRJ_DB_PATH={args.db} antes de iniciar a API.")
+    print(f"\nBase de demonstração: {args.db}\nPara ver no painel: python iniciar.py --demo")
 
 
 if __name__ == "__main__":

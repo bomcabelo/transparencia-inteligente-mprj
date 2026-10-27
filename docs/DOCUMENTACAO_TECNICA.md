@@ -108,14 +108,14 @@ Por que não "mandar a página inteira para um LLM": seria caro (5.000 portais �
 
 | Tecnologia | Uso | Justificativa |
 |---|---|---|
-| Python 3.11+ | Todo o backend | Ecossistema de scraping, dados e IA |
+| Python 3.10+ (testado até 3.14) | Todo o backend | Ecossistema de scraping, dados e IA |
 | requests + BeautifulSoup | Coleta e parsing | Simples, robustos, sem navegador para a maioria dos portais |
 | Playwright (opcional) | Páginas que dependem de JavaScript | Renderiza SPAs e tira screenshots |
 | SQLite → PostgreSQL | Persistência | SQLite dispensa infraestrutura na POC. O esquema (SQL padrão, sem recursos exclusivos) migra para PostgreSQL |
 | FastAPI | API | OpenAPI/Swagger automático, tipagem, testes com TestClient |
 | Streamlit + Altair | Dashboard | Painel analítico rápido de construir que consome a API |
 | openpyxl | Importação do checklist | Planilha original versionada como fonte de verdade |
-| pytest | Testes | 88 testes, incluindo pipeline ponta a ponta offline |
+| pytest | Testes | 89 testes, incluindo pipeline ponta a ponta offline e abertura do painel |
 
 ## 5. Metodologia de avaliação
 

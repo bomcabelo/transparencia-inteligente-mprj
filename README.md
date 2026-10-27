@@ -26,59 +26,69 @@ Desafio técnico GATE/MPRJ — Cientista de Dados. Autor: Anderson da Silva Rodr
 - **Reprodutível.** Snapshots HTML endereçados por SHA-256 permitem reprocessar coletas antigas com regras novas, sem acessar os portais.
 - **IA opcional e controlada.** Recebe só trechos pré-filtrados, precisa citar texto literal, tem cache e teto de chamadas, e divergência com a regra vai para revisão humana.
 
-## Instalação
+## Início rápido
 
-```cmd
+Requer **Python 3.10 ou mais novo** (testado do 3.10 ao 3.14) e Git. Os comandos são os mesmos no CMD, no PowerShell, no Linux e no macOS:
+
+```
 git clone https://github.com/bomcabelo/transparencia-inteligente-mprj.git
 cd transparencia-inteligente-mprj
-python -m venv .venv
-.venv\Scripts\activate.bat
-pip install -r requirements.txt
-python -m pytest -q
+python -m pip install -r requirements.txt
+python iniciar.py
 ```
 
-No Linux/macOS, ative com `source .venv/bin/activate`. Requer Python 3.11+.
+O `iniciar.py` confere o ambiente, prepara os dados, sobe a API e o painel e abre o navegador. Ctrl+C encerra tudo.
 
-## Uso rápido
+- **Painel:** <http://localhost:8501>
+- **API e Swagger:** <http://127.0.0.1:8000/docs>
 
-### Opção A — demonstração offline (portais sintéticos)
+Os dados vêm da avaliação real, se ela já tiver sido executada nesta máquina. Senão, vêm de uma **base de demonstração** com quatro entidades fictícias (`[DEMO] ...`) e três meses de histórico, criada na hora e sem acesso à internet. A pasta `data/` não vai para o repositório, então um clone novo começa pela demonstração.
 
-Gera quatro entidades fictícias (`[DEMO] ...`) com três execuções mensais, para explorar histórico, evolução e não aplicáveis sem acesso à internet:
+No Linux e no macOS, se `python` não existir, use `python3`. Se preferir isolar as dependências num ambiente virtual, crie-o antes do `pip install`:
 
-```cmd
-python -m src.demo
-set MPRJ_DB_PATH=data\demo.sqlite3
-python -m uvicorn api.main:app --reload
+| Terminal | Criar e ativar o ambiente virtual |
+|---|---|
+| CMD | `python -m venv .venv` e `.venv\Scripts\activate.bat` |
+| PowerShell | `python -m venv .venv` e `.venv\Scripts\Activate.ps1` |
+| Linux/macOS | `python3 -m venv .venv` e `source .venv/bin/activate` |
+
+Para conferir a instalação sem abrir nada: `python iniciar.py --verificar`. Para rodar os testes: `python -m pytest -q`.
+
+### Avaliar os municípios reais
+
+Exige internet e leva cerca de 10 minutos por município, porque o robô espera entre as requisições para não sobrecarregar os portais:
+
 ```
-
-No Linux/macOS, use `export MPRJ_DB_PATH=data/demo.sqlite3`.
-
-### Opção B — avaliação real dos municípios
-
-```cmd
 python -m src.pipeline run --workers 3
-python -m uvicorn api.main:app --reload
+python iniciar.py
 ```
 
-Para avaliar só alguns municípios: `python -m src.pipeline run --entity japeri --entity rio-de-janeiro`.
+Para avaliar só alguns: `python -m src.pipeline run --entity japeri --entity rio-de-janeiro`.
 
-### Dashboard
+### Problemas comuns
 
-Em outro terminal, com o ambiente virtual ativo:
+| Sintoma | Causa e solução |
+|---|---|
+| `No module named ...` ao iniciar | Dependências instaladas em outro Python. Rode `python -m pip install -r requirements.txt` com o mesmo `python` usado no `iniciar.py` |
+| `Activate.ps1 não pode ser carregado` (PowerShell) | Política de execução do Windows. Rode `Set-ExecutionPolicy -Scope Process Bypass` no mesmo terminal, ou use o CMD, ou pule o ambiente virtual |
+| Painel abre, mas sem entidades | O banco está vazio. Use `python iniciar.py --demo` |
+| Porta 8000 ou 8501 ocupada | O `iniciar.py` escolhe a próxima porta livre e mostra o endereço |
+| `pip install` falha na rede institucional | Configure o proxy: `python -m pip install --proxy http://usuario:senha@proxy:porta -r requirements.txt` |
 
-```cmd
-python -m streamlit run app/dashboard.py
+### Iniciar API e painel separadamente
+
+O `iniciar.py` faz isto por você. Para controlar cada parte, use dois terminais:
+
 ```
-
-- API e Swagger: <http://127.0.0.1:8000/docs>
-- Dashboard: <http://localhost:8501>
-
-O dashboard consulta a API em `MPRJ_API_URL` (padrão `http://127.0.0.1:8000`).
+python -m uvicorn api.main:app            # terminal 1 (MPRJ_DB_PATH escolhe o banco)
+python -m streamlit run app/dashboard.py  # terminal 2 (MPRJ_API_URL aponta a API)
+```
 
 ## Comandos
 
 | Comando | O que faz |
 |---|---|
+| `python iniciar.py [--demo] [--banco arquivo] [--verificar]` | Sobe API e painel com dados (avaliação real ou demonstração) |
 | `python -m src.pipeline run [--entity id] [--workers N] [--no-probes]` | Coleta, avalia, pontua e grava uma nova execução |
 | `python -m src.pipeline reevaluate --latest` | Reaplica as regras atuais às últimas coletas, a partir dos snapshots (sem rede) |
 | `python -m src.scheduler --interval-hours 720` | Execução periódica residente. Para `schtasks` e `cron`, veja `src/scheduler.py` |
@@ -115,6 +125,7 @@ O dashboard consulta a API em `MPRJ_API_URL` (padrão `http://127.0.0.1:8000`).
 ## Estrutura
 
 ```
+iniciar.py      inicia API + painel com um comando
 api/            API FastAPI (somente leitura)
 app/            Dashboard Streamlit (consome só a API)
 config/         checklist.json (gerado da planilha), metodologia.json, municipios.json, fonte/*.xlsx
@@ -135,7 +146,7 @@ src/
   validacao.py  planilha de validação robô × avaliador humano
   demo.py       portal sintético para testes e demonstração
   crawler.py, discovery.py, evidence.py, evaluator.py, database.py, geosiap_*   etapas exploratórias anteriores
-tests/          88 testes (regras, score, IA, fetch, pipeline ponta a ponta, API)
+tests/          89 testes (regras, score, IA, fetch, pipeline ponta a ponta, API, painel)
 docs/           documentação técnica, critérios, histórico das etapas
 ```
 
